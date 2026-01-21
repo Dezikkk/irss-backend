@@ -17,10 +17,10 @@ You can access the auto-generated docs through http://127.0.0.1:8000/docs (genui
 
 ## Project structure
 The purpose of each folder in the project tree is the following:
-`database` -> Everything directly related to the SQL, mainly the initialization of the database.
-`models` -> SQLModel Python representation of the database tables.
-`routes` -> Routes/views/URLs for accessing the api.
-`serializers` -> Models to handle the expected body of the requests.
-`utils` -> Utility functions related to security and whatnot.
+- `database`: Everything directly related to the SQL, mainly the initialization of the database.
+- `models`: SQLModel Python representation of the database tables.
+- `routes`: Routes/views/URLs for accessing the api.
+- `serializers`: Models to handle the expected body of the requests.
+- `utils`: Utility functions related to security and whatnot.
 
 
