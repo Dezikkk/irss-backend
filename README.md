@@ -5,6 +5,7 @@
 - Implementing absolutely everything more specific than the aforementioned, i.e. generating tokens, hashed passwords, verifying and sending emails
 - Rethinking the database since it heavily depends on the implementation, particularly the (not yet written) module for passwords.
 - Refactoring and sticking to one language?...
+- Adding automated and fuller tests would be nice
 
 ## Running the project
 You need a PostgreSQL server up and running in order to communicate with a database, otherwise the application is rendered useless.
