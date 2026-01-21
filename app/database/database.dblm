@@ -1,0 +1,31 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table studia {
+  id uuid [primary key]
+  token varchar(50)
+  email_starosty varchar(50)
+  opis varchar(50)
+  ilosc_grup int
+  maks_osob int[]
+  data_utworzenia timestamp
+  data_zakonczenia timestamp
+}
+
+Table zapis {
+  id uuid [primary key]
+  studia_id int
+  email varchar(50)
+  priorytety int[]
+  data_utworzenia timestamp
+}
+
+Table haslo {
+  id uuid [primary key]
+  studia_id int
+  kod varchar(50)
+  email varchar(50)
+  data_waznosci timestamp
+}
+
+Ref: zapis.studia_id > studia.id
