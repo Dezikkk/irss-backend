@@ -1,0 +1,91 @@
+Table study_programs {
+  id int [pk, increment]
+  name varchar [unique, note: 'np. "Inf rok 1"']
+  description text
+  is_active bool [default: true]
+  
+  indexes {
+    name
+  }
+}
+
+Table users {
+  id int [pk, increment]
+  email varchar [unique]
+  role user_role [default: 'student']
+  study_program_id int [ref: > study_programs.id]
+  
+  indexes {
+    email
+  }
+}
+
+Table invitations {
+  id int [pk, increment]
+  token varchar [unique]
+  target_role user_role
+  target_study_program_id int [ref: > study_programs.id, note: 'cascade delete']
+  max_uses int [default: 1, note: '1 dla starosty, ~200 dla studentów']
+  current_uses int [default: 0]
+  expires_at datetime
+  
+  indexes {
+    token
+  }
+}
+
+Table auth_tokens {
+  id int [pk, increment]
+  email varchar
+  token varchar [unique]
+  expires_at datetime
+  is_used bool [default: false]
+  created_at datetime [default: `now()`]
+  
+  indexes {
+    email
+    token
+  }
+}
+
+Table registration_campaigns {
+  id int [pk, increment]
+  creator_id int [ref: > users.id, note: 'starosta']
+  study_program_id int [ref: > study_programs.id]
+  title varchar [note: 'np. Cyberbezpieczeństwo stacjonarnie rok 3']
+  starts_at datetime
+  ends_at datetime
+  access_code varchar [null, note: 'opcjonalne hasło']
+  is_active bool [default: true]
+}
+
+Table registration_groups {
+  id int [pk, increment]
+  campaign_id int [ref: > registration_campaigns.id, note: 'cascade delete']
+  name varchar [note: 'np. L1 - chmury, L2 - devops']
+  limit int [note: 'max liczba miejsc']
+}
+
+Table registrations {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  group_id int [ref: > registration_groups.id]
+  priority int [default: 1, note: '1=najwyższy priorytet']
+  status registration_status [default: 'submitted']
+  created_at datetime [default: `now()`]
+  
+  indexes {
+    (user_id, group_id) [unique, name: 'uq_user_group_pref']
+  }
+}
+
+Enum user_role {
+  student
+  admin [note: 'starosta']
+}
+
+Enum registration_status {
+  submitted [note: 'czeka na rozpatrzenie']
+  assigned [note: 'przydzielony przez algorytm']
+  rejected [note: 'odrzucony - brak miejsc']
+}

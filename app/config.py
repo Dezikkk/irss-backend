@@ -1,20 +1,31 @@
-from sqlalchemy import URL
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from fastapi import FastAPI
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    database_url: str = URL.create(
-        "postgresql",
-        username="postgres",
-        password="",
-        host="localhost",
-        database="zapisy_backend",
-    ).__to_string__()
-    secret_key: str = "random"
-    algorithm: str = "HS256"
-    token_expire_minutes: int = 30
-    password_expire_minutes: int = 30
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+    
+    # zdefiniowane wszystkie zmienne srodowiskowe z pliku .env
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str
+    TOKEN_EXPIRE_MINUTES: int
+    SESSION_EXPIRE_HOURS: int
+    ALLOWED_DOMAINS: str
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    SMTP_FROM: str
+    APP_NAME: str
+    BASE_URL: str
 
-@lru_cache()
+@lru_cache
 def get_settings():
-    return Settings()
+    return Settings() # type: ignore
+
+settings = get_settings()
