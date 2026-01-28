@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.serializers.schemas import CreateStudentInviteRequest, InvitationLinkResponse
 
 settings = get_settings()
-router = APIRouter(prefix="/admin", tags=["Admin", "Starosta"])
+router = APIRouter(prefix="/admin", tags=["Admin(Starosta)"])
 
 # 
 @router.post("/create-student-invite", response_model=InvitationLinkResponse)
@@ -51,7 +51,7 @@ async def create_student_invite(
     db.add(invite)
     db.commit()
 
-    # Zbuduj pełny link 
+    # Zbuduj pełny link (na razie nie bedzie dzialal bo register-with-invite przyjmue poki co tylko post, jak bedzie frontend to dokonczyc zeby poprosic usera o email)
     # TODO: jak sie podłączy z frontendem to bedzie trzeba zmienic sciezke prawdopodobine
     full_link = f"{settings.BASE_URL}/auth/register-with-invite?code={token}"
 

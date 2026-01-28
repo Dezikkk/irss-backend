@@ -14,6 +14,7 @@ settings = get_settings()
 # typ autoryzacji aplikacji, w swagger (localhost:8000/docs) mozna uzyc authorize wklejajac token jwt
 security = HTTPBearer()
 
+# zezwoli na dostep tylko zalogowanemu userowi dowolnej roli
 async def get_current_user(
     token: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: SessionDep
@@ -53,6 +54,8 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 # funkcje sprawdzajace poziom autoryzacji 
+
+# zezwala na dostep tylko adminowi
 async def get_current_admin(user: CurrentUser) -> User:
     if user.role != UserRole.ADMIN:
         raise HTTPException(
@@ -61,6 +64,7 @@ async def get_current_admin(user: CurrentUser) -> User:
         )
     return user
 
+# zezwoli na dostep tylko studentowi(useless, bo starosta tez jest studentem wiem :v)
 async def get_current_student(user: CurrentUser) -> User:
     if user.role != UserRole.STUDENT:
         raise HTTPException(

@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from app.config import get_settings
 
 settings = get_settings()
-router = APIRouter()
+router = APIRouter(prefix="/debug", tags=["Debug"])
 
 # dump wszystkich zmiennych srodowiskowych
 # tak wiem mega bezpieczne :3

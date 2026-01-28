@@ -15,44 +15,8 @@ from app.models.models import AuthToken, Invitation, User
 from app.config import get_settings
 
 settings = get_settings()
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
-# logowanie (dla osób które już mają konto)
-@router.post("/request-magic-link", response_model=MagicLinkResponse)
-async def request_magic_link(
-    email_request: EmailRequest,
-    db: SessionDep
-):
-    email = email_request.email
-    
-    # czy taki student w ogóle istnieje
-    user = db.exec(select(User).where(User.email == email)).first()
-    if not user:
-         raise HTTPException(
-            status_code=404,
-            detail="Taki użytkownik nie istnieje. Jeśli masz kod od starosty, użyj rejestracji z kodem."
-        )
-
-    # generowanie tokenu logowania
-    token = generate_magic_token()
-    expires_at = datetime.now() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
-    
-    auth_token = AuthToken(
-        email=email,
-        token=token,
-        expires_at=expires_at
-    )
-    
-    db.add(auth_token)
-    db.commit()
-    
-    await send_magic_link_email(email, token)
-    
-    return MagicLinkResponse(
-        message="Sprawdź skrzynkę",
-        detail=f"Wysłano link logowania na adres {email}."
-    )
-    
 # rejestracja z kodem (dla nowych osób) 
 @router.post("/register-with-invite", response_model=MagicLinkResponse)
 async def register_with_invite(
@@ -119,8 +83,45 @@ async def register_with_invite(
         message="Konto utworzone pomyślnie!",
         detail=f"Witaj w systemie! Na adres {email} wysłaliśmy link do pierwszego logowania."
     )
+
+# logowanie (dla osób które już mają konto)
+@router.post("/request-magic-link", response_model=MagicLinkResponse)
+async def request_magic_link(
+    email_request: EmailRequest,
+    db: SessionDep
+):
+    email = email_request.email
     
-#  weryfikacja (kliknięcie w link z maila) 
+    # czy taki student w ogóle istnieje
+    user = db.exec(select(User).where(User.email == email)).first()
+    if not user:
+         raise HTTPException(
+            status_code=404,
+            detail="Taki użytkownik nie istnieje. Jeśli masz kod od starosty, użyj rejestracji z kodem."
+        )
+
+    # generowanie tokenu logowania
+    token = generate_magic_token()
+    expires_at = datetime.now() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
+    
+    auth_token = AuthToken(
+        email=email,
+        token=token,
+        expires_at=expires_at
+    )
+    
+    db.add(auth_token)
+    db.commit()
+    
+    await send_magic_link_email(email, token)
+    
+    return MagicLinkResponse(
+        message="Sprawdź skrzynkę",
+        detail=f"Wysłano link logowania na adres {email}."
+    )
+    
+  
+# weryfikacja (kliknięcie w link z maila) 
 @router.get("/verify", response_model=TokenResponse)
 async def verify_token(token: str, db: SessionDep):
     # sprawdz authtoken w db
