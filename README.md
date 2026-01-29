@@ -40,7 +40,8 @@ The purpose of each folder in the project tree is the following:
 
 ## Running locally
 ```text
-> All you need to do is run script in powershell "run.ps1". 
+> Change ".env.example" filename to ".env" and fill in what is needed(DB and SMTP credentials)
+> Now, all you need to do is run script in powershell "run.ps1". 
 It will create a virtual enviorment, download all depedencies and start server :D
 
 tip: You can access the auto-generated docs through http://127.0.0.1:8000/docs
