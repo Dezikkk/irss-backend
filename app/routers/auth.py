@@ -23,6 +23,10 @@ async def register_with_invite(
     payload: RegisterWithInviteRequest,
     db: SessionDep
 ):
+    """
+    Tworzy konto użytkownika na podstawie kodu zaproszenia wygenerowanego przez Starostę. 
+    System automatycznie przypisuje rolę i kierunek studiów zdefiniowane w zaproszeniu.
+    """
     email = payload.email
     code = payload.invite_code
 
@@ -90,6 +94,10 @@ async def request_magic_link(
     email_request: EmailRequest,
     db: SessionDep
 ):
+    """
+    Wysyła jednorazowy token logowania na e-mail dla użytkowników, którzy mają już konto w systemie.
+    """
+    
     email = email_request.email
     
     # czy taki student w ogóle istnieje
@@ -124,6 +132,14 @@ async def request_magic_link(
 # weryfikacja (kliknięcie w link z maila) 
 @router.get("/verify", response_model=TokenResponse)
 async def verify_token(token: str, db: SessionDep):
+    """
+    Punkt końcowy dla linków z wiadomości e-mail. Weryfikuje token i zwraca JWT Access Token.
+    
+    Po pomyślnej weryfikacji token zostaje oznaczony jako zużyty (`is_used = True`).
+    Zwrócony token JWT należy przesyłać w nagłówku `Authorization: Bearer <token>` 
+    przy każdym kolejnym zapytaniu.
+    """
+    
     # sprawdz authtoken w db
     auth_token = db.exec(select(AuthToken).where(AuthToken.token == token)).first()
     

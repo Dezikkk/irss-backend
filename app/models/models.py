@@ -5,7 +5,7 @@ import enum
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 from sqlalchemy import Column, Enum, Text
 
-# --- ENUMS (Słowniki) ---
+# ENUMS (Słowniki) 
 class UserRole(str, enum.Enum):
     STUDENT = "student"
     ADMIN = "starosta"
@@ -167,3 +167,4 @@ class Registration(SQLModel, table=True):
     # Relacje
     student: Optional[User] = Relationship(back_populates="registrations")
     group: Optional[RegistrationGroup] = Relationship(back_populates="registrations")
+    

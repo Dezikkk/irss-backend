@@ -1,12 +1,21 @@
-from datetime import datetime, timedelta
 import secrets
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import case, func, and_ 
+from sqlmodel import select, col
 
+from app.config import get_settings
 from app.database import SessionDep
 from app.core.dependencies import CurrentAdmin, CurrentUser 
-from app.models.models import Invitation, UserRole
-from app.config import get_settings
-from app.serializers.schemas import CreateStudentInviteRequest, InvitationLinkResponse
+from app.models.models import (
+    Invitation, Registration, RegistrationCampaign, RegistrationGroup, 
+    RegistrationStatus, UserRole
+    )
+from app.serializers.schemas import (
+    BulkGroupCreateRequest, BulkGroupResponse, CampaignCreateRequest, CampaignDetailResponse, 
+    CampaignResponse, CampaignUpdateRequest, CreateStudentInviteRequest, GroupStatsResponse, 
+    GroupUpdateRequest, InvitationLinkResponse
+    )
 
 settings = get_settings()
 router = APIRouter(prefix="/admin", tags=["Admin(Starosta)"])
@@ -19,8 +28,10 @@ async def create_student_invite(
     db: SessionDep
 ):
     """
-    Tylko dla STAROSTY.
     Generuje link zaproszeniowy dla studentów z tego samego rocznika.
+    Tylko dla STAROSTY.
+    
+    Generuje link, który po przesłaniu studentom pozwala im na założenie konta bez ręcznej weryfikacji przez administratora systemu.
     """
     # sprawdź uprawnienia czy osoba tworząca jest starostą(student nie moze tworzyc zaproszen)
     if current_user.role != UserRole.ADMIN:
@@ -51,8 +62,10 @@ async def create_student_invite(
     db.add(invite)
     db.commit()
 
-    # Zbuduj pełny link (na razie nie bedzie dzialal bo register-with-invite przyjmue poki co tylko post, jak bedzie frontend to dokonczyc zeby poprosic usera o email)
+    # Zbuduj pełny link (na razie nie bedzie dzialal bo register-with-invite przyjmue poki co tylko post, 
+    # jak bedzie frontend to dokonczyc zeby poprosic usera o email)
     # TODO: jak sie podłączy z frontendem to bedzie trzeba zmienic sciezke prawdopodobine
+    # albo zrobic nowa metode ktora przyjmie kod w requescie i poprosi o email
     full_link = f"{settings.BASE_URL}/auth/register-with-invite?code={token}"
 
     return InvitationLinkResponse(
@@ -61,3 +74,299 @@ async def create_student_invite(
         expires_at=expires_at,
         max_uses=payload.max_uses
     )
+    
+@router.post("/campaigns/create", response_model=CampaignResponse)
+async def create_campaign(
+    payload: CampaignCreateRequest,
+    current_user: CurrentAdmin,  # walidacja autoryzacji: tylko starosta przejdzie
+    db: SessionDep
+):
+    """
+    Tworzy nową kampanię zapisów (np. 'Lato 2026') dla studentów z Twojego rocznika.
+    
+    Data zakończenia musi być późniejsza niż data rozpoczęcia.
+    Kampania zostanie automatycznie przypisana do `study_program_id` Starosty.
+    """
+    
+    # waliduje czy starosta jest przypisany do rocznika (mimo ze link rejestracyjny przypisuje to dla pewnosci)
+    if not current_user.study_program_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Nie jesteś przypisany do żadnego rocznika, nie możesz stworzyć kampanii."
+        )
+    
+    # walidajca dat
+    if payload.ends_at <= payload.starts_at:
+        raise HTTPException(
+            status_code=400,
+            detail="Data zakończenia musi być późniejsza niż data rozpoczęcia."
+        )
+
+    # tworzenie obiektu bazy danych
+    new_campaign = RegistrationCampaign(
+        title=payload.title,
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        creator_id=current_user.id, # starosta jako autor i admin kampanii
+        study_program_id=current_user.study_program_id
+    )
+
+    db.add(new_campaign)
+    db.commit()
+    db.refresh(new_campaign)
+
+    # obliczanie czy jest aktywna
+    now = datetime.now()
+    is_active_now = new_campaign.starts_at <= now <= new_campaign.ends_at
+
+    if new_campaign.id is None:
+        raise HTTPException(status_code=500, detail="Błąd zapisu kampanii do bazy danych")
+
+    return CampaignResponse(
+        id=new_campaign.id, 
+        title=new_campaign.title,
+        starts_at=new_campaign.starts_at,
+        ends_at=new_campaign.ends_at,
+        is_active=is_active_now
+    )
+    
+@router.post("/campaigns/{campaign_id}/groups", response_model=BulkGroupResponse)
+async def add_groups_to_campaign(
+    campaign_id: int,
+    payload: BulkGroupCreateRequest,
+    current_user: CurrentAdmin,
+    db: SessionDep
+):
+    """
+    Umożliwia dodanie wielu grup zajęciowych do istniejącej kampanii w jednym zapytaniu.
+    Waliduje, czy kampania należy do zalogowanego Starosty.
+    Wysyłając listę nazw (np. L1, L2, L3) i limitów, system automatycznie powiąże je z wybraną kampanią.
+    """
+    
+    # pobiera kampanię z bazy i spr czy istnieje
+    campaign = db.get(RegistrationCampaign, campaign_id)
+    
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Taka kampania nie istnieje.")
+
+    # zabezpieczenie przed nieautoryzowana edycja kampanii przez innego staroste
+    # jeśli ID twórcy kampanii jest inne niż ID zalogowanego usera -> Błąd 403
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=403, 
+            detail="Nie masz uprawnień do edycji tej kampanii (nie jesteś jej autorem)."
+        )
+
+    # pętla tworząca obiekty grup
+    new_groups = []
+    for group_data in payload.groups:
+        group = RegistrationGroup(
+            name=group_data.name,
+            limit=group_data.limit,
+            campaign_id=campaign_id 
+        )
+        new_groups.append(group)
+
+    # zapis do bazy wszystkich grup na raz
+    db.add_all(new_groups)
+    db.commit()
+
+    return BulkGroupResponse(
+        message="Grupy zostały pomyślnie dodane.",
+        created_count=len(new_groups)
+    )
+    
+@router.get("/campaigns/{campaign_id}", response_model=CampaignDetailResponse)
+async def get_campaign_details(
+    campaign_id: int,
+    current_user: CurrentAdmin,
+    db: SessionDep
+):
+    """
+    Pobiera szczegóły kampanii wraz ze statystykami zapisów.
+    Zwraca pełne dane o kampanii, w tym listę grup, ich limity oraz liczbę osób, które wybrały daną grupę jako priorytet nr 1.
+    
+    `first_priority_count`: Liczba studentów, którzy ustawili grupę na 1. miejscu (popyt).
+    `current_count`: Liczba studentów ostatecznie przydzielonych (`ASSIGNED`) do grupy.
+    """
+    
+    # pobierz kampanie
+    campaign = db.get(RegistrationCampaign, campaign_id)
+    
+    # walidacje
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
+
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="To nie Twoja kampania. Nie możesz podglądać wyników.")
+
+    if campaign.id is None:
+        raise HTTPException(status_code=500, detail="Błąd integralności danych (brak ID kampanii)")
+    
+    statement = (
+        select(
+            RegistrationGroup,
+            # licznik 1: ile osob ma status ASSIGNED(przydzielono)
+            # bedzie działać po zadzialaniu algorytmu przydzielajacego
+            func.count(
+                case(
+                    (col(Registration.status) == RegistrationStatus.ASSIGNED, 1)
+                )
+            ),
+            # licznik 2: popularność
+            # ile osob dala ta grupe na pierwszy priorytet
+            func.count(
+                case(
+                    (col(Registration.priority) == 1, 1)
+                )
+            )
+        )
+        .outerjoin(
+            Registration,
+            and_(
+                col(Registration.group_id) == col(RegistrationGroup.id),
+                col(Registration.status) != RegistrationStatus.REJECTED 
+                # ^ ignorujemy odrzuconych, bierzemy SUBMITTED i ASSIGNED
+            )
+        )
+        .where(col(RegistrationGroup.campaign_id) == campaign_id)
+        .group_by(col(RegistrationGroup.id))
+    )
+    
+    results = db.exec(statement).all()
+    
+    groups_response = []
+    total_students = 0 # sumuje przypisanych (ASSIGNED)
+
+    for group, assigned_count, priority_count in results:
+
+        total_students += assigned_count
+        if group.id is None: continue 
+
+        groups_response.append(
+            GroupStatsResponse(
+                id=group.id,
+                name=group.name,
+                limit=group.limit,
+                first_priority_count=priority_count,    # ile chętnych na 1. wybór
+                current_count=assigned_count,           # ile miejsc zajętych(po przydzielniu)
+                is_full=assigned_count >= group.limit
+            )
+        )
+
+    now = datetime.now()
+    is_active_now = campaign.starts_at <= now <= campaign.ends_at
+
+    return CampaignDetailResponse(
+        id=campaign.id,
+        title=campaign.title,
+        starts_at=campaign.starts_at,
+        ends_at=campaign.ends_at,
+        is_active=is_active_now,
+        total_registered_students=total_students,
+        groups=groups_response
+    )
+    
+    
+@router.patch("/campaigns/{campaign_id}", response_model=CampaignResponse)
+async def update_campaign(
+    campaign_id: int,
+    payload: CampaignUpdateRequest,
+    current_user: CurrentAdmin,
+    db: SessionDep
+):
+    """
+    Edycja danych kampanii (tytuł, daty).
+    Pozwala na częściową aktualizację kampanii (np. zmianę samego tytułu lub przedłużenie czasu zapisów).
+    """
+    # pobierz kampanię z bazy
+    campaign = db.get(RegistrationCampaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
+
+    # sprawdź czyja to kampania
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="To nie Twoja kampania.")
+
+    # logika aktualizacji (z validation dat)
+    
+    # przygotuj dane do zmiany (odrzucamy to co jest None w payloadzie)
+    update_data = payload.model_dump(exclude_unset=True)
+    
+    # walidacja dat (jeśli user zmienia którąś z dat, musimy sprawdzić spójność)
+    # bierzemy nową datę z payloadu, a jak jej nie ma, to starą z bazy
+    new_start = payload.starts_at or campaign.starts_at
+    new_end = payload.ends_at or campaign.ends_at
+    
+    if new_end <= new_start:
+        raise HTTPException(status_code=400, detail="Data zakończenia musi być późniejsza niż startu.")
+
+    # aplikujemy zmiany
+    for key, value in update_data.items():
+        setattr(campaign, key, value)
+
+    db.add(campaign)
+    db.commit()
+    db.refresh(campaign)
+
+    # oblicza is_active do odpowiedzi
+    now = datetime.now()
+    is_active_now = campaign.starts_at <= now <= campaign.ends_at
+
+    if campaign.id is None:
+        raise HTTPException(status_code=500, detail="Błąd integralności danych: brak ID kampanii.")
+
+    return CampaignResponse(
+        id=campaign.id, 
+        title=campaign.title,
+        starts_at=campaign.starts_at,
+        ends_at=campaign.ends_at,
+        is_active=is_active_now
+    )
+
+
+
+@router.patch("/groups/{group_id}")
+async def update_group(
+    group_id: int,
+    payload: GroupUpdateRequest,
+    current_user: CurrentAdmin,
+    db: SessionDep
+):
+    """
+    Pozwala na zmianę nazwy grupy lub modyfikację limitu miejsc.
+    """
+    # pobierz grupę z db
+    group = db.get(RegistrationGroup, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupa nie istnieje.")
+
+    # pobierz kampanię tej grupy, żeby sprawdzić właściciela
+    campaign = group.campaign
+    if not campaign or campaign.creator_id is None:
+        raise HTTPException(status_code=404, detail="Błąd spójności danych (brak kampanii).")
+
+    # 3. sprawdź uprawnienia (czy Starosta jest właścicielem kampanii, do której należy grupa)
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Brak uprawnień.")
+
+    # aplikuj zmiany
+    update_data = payload.model_dump(exclude_unset=True)
+    
+    for key, value in update_data.items():
+        setattr(group, key, value)
+
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+
+    return {
+        "message": "Zaktualizowano grupę",
+        "group": {
+            "id": group.id,
+            "name": group.name,
+            "limit": group.limit
+        }
+    }
+    
+    

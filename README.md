@@ -1,40 +1,42 @@
-## Features
-- passwordless login (magic links)
-- async smtp via gmail for magic links  
-- jwt tokens are implemented, stateless session
-- roles are split: admin (starosta) and regular student
-- script to create the first admin (starosta) user is ready
-- invites: 
-    - to generate starosta invite use `create_invite.py` script
-    - starosta can generate invite link for students
-- nice project structure (i suppose :3)
-- database models and relations are set up
-
-## TODO: What we don't have...
-
-- [ ] Campaign management by the administrator
-    - [ ] defining groups and slots
-    - [ ] when a campaign is definitively defined, it creates a link for users
-    - [ ] editing the number of places in groups
-    - [ ] previewing how many people are in a given group
-- [ ] Student registration logic
-    - [ ] POST /student/register - sends all priorities 
-    - [ ] logic to prevent double signups
-- [ ] Campaign finish management
+## Project status checklist
+<!-- [x] done, [ ] not done yet -->
+- [x] passwordless login (magic links)
+- [x] async smtp via gmail for magic links  
+- [x] jwt tokens are implemented, stateless session
+- [x] roles are split: admin (starosta) and regular student
+- [x] script to create the first admin (starosta) user is ready
+- [x] invites: 
+    - [x] to generate starosta invite use `create_invite.py` script
+    - [x] starosta can generate invite link for students
+- [x] nice project structure (i suppose :3)
+- [x] database models and relations are set up
+- [x] description for each endpoint (swagger docs(localhost:8000/docs))
+- [x] campaign management by the administrator
+    - [x] defining groups and slots
+    - [x] editing the campaign title and dates
+    - [x] editing the group names, limits
+    - [x] previewing popularity of given group(how many people picked priority 1)
+- [x] student registration logic
+    - [x] preview available campaigns with "wkrótce / aktywny / zakończono" status
+    - [x] POST /student/register - students submit their priorities for ALL groups
+    - [x] validation for unique priorities (no cheating)
+    - [x] logic to prevent double signups (one submission per campaign)
+    - [ ] fix the N+1 problem in /available-campaigns
+- [ ] adding debug mode that enables a dangerous test endpoint, which can be enabled in .env
+- [ ] campaign finish management
     - [ ] assigning students to groups according to their priorities
         - [ ] doing it by random or first come first served roles
     - [ ] generating excel results
 - [ ] docker and tests maybe later idk
 
----
 
 ## Project structure
 The purpose of each folder in the project tree is the following:
 1. `/app`
     - `/models`: SQLModel Python representation of the database tables.
-    - `/routes`: Routes for accessing the api.
-    - `/serializers`: Models to handle the expected body of the requests.
-    - `/core`: Utility functions related to security and whatnot.
+    - `/routes`: Routes for accessing the api (auth, admin, student, etc).
+    - `/serializers`: Models/Schemas to handle the request/response bodies.
+    - `/core`: Utility functions related to security, dependencies and whatnot.
 2. `/database`: Schematic of DB in picture and dbdiagram.io code
 
 
@@ -51,18 +53,25 @@ It show full list of endpoints and payloads (genuinely useful)
 
 ## API Endpoints
 
+Detailed description of every endpoint is avaiable on localhost:8000/docs
+
+
 | method | endpoint | who | what it does |
 | :---: | --- | :---: | --- |
-| **POST** | `/auth/register-with-invite` | anyone | signup for newbies (u need a code) |
-| **POST** | `/auth/request-magic-link` | anyone | login if u have an account (sends the email) |
-| **GET** | `/auth/verify` | anyone | the thing u click in email, swaps link for jwt token |
-| **GET** | `/users/dashboard` | logged-in | shows ur info & checks if ur admin or student |
-| **POST** | `/admin/create-student-invite` | admin | generates the invitation link for student  |
-| **GET** | `/student/my-groups` | student | shows ur classes (once we actually build it) |
+|**POST**|/auth/register-with-invite|anyone|signup for newbies (u need a code)|
+|**POST**|/auth/request-magic-link|anyone|login if u have an account (sends the email)|
+|**GET**|/auth/verify|anyone|"the thing u click in email, swaps link for jwt token"|
+|**GET**|/users/dashboard|logged-in|shows ur info & checks if ur admin or student|
+|**POST**|/admin/create-student-invite|admin|generates the invitation link for student|
+|**POST**|/admin/campaigns/create|admin|creates new registration campaign|
+|**GET**|/admin/campaigns/{id}|admin|shows stats, priority counts and who is assigned|
+|**PATCH**|/admin/campaigns/{id}|admin|edit campaign dates or title|
+|**PATCH**|/admin/groups/{id}|admin|edit group name or limit|
+|**GET**|/student/available-campaigns|student|see what campaigns are there + popularity stats|
+|**POST**|/student/register|student|send your priorities for a campaign|
+|**GET**|/student/my-groups|student|shows ur assigned classes and ur priorities|
 
-Detailed description of every endpoint will be avaiable on localhost:8000/docs when i finally write it. Or
 
----
 
 ## Database structure
 
