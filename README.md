@@ -81,6 +81,7 @@ Detailed description of every endpoint is avaiable on localhost:8000/docs
 |**GET**|/student/available-campaigns|student|see what campaigns are there + popularity stats|
 |**POST**|/student/register|student|send your priorities for a campaign|
 |**GET**|/student/my-groups|student|shows ur assigned classes and ur priorities|
+|**POST**|/campaigns/{campaign_id}/resolve|admin|assigns students to groups according to the selected method|
 
 
 
