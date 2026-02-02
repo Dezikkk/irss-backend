@@ -5,6 +5,7 @@ from sqlalchemy import case, func, and_
 from sqlmodel import select, col
 
 from app.config import get_settings
+from app.core.assignment import resolve_campaign_logic
 from app.database import SessionDep
 from app.core.dependencies import CurrentAdmin, CurrentUser 
 from app.models.models import (
@@ -61,11 +62,9 @@ async def create_student_invite(
     
     db.add(invite)
     db.commit()
-
-    # Zbuduj pełny link (na razie nie bedzie dzialal bo register-with-invite przyjmue poki co tylko post, 
-    # jak bedzie frontend to dokonczyc zeby poprosic usera o email)
-    # TODO: jak sie podłączy z frontendem to bedzie trzeba zmienic sciezke prawdopodobine
-    # albo zrobic nowa metode ktora przyjmie kod w requescie i poprosi o email
+    
+    # TODO: obecnie link nie bedzie działał bo register-with-invite przyjmuje POST. trzeba tam wkleic endpoint frontendu
+    # jak bedzie frontend to dokonczyc zeby poprosic usera o email i dalej wysylac posta na register-with-invite
     full_link = f"{settings.BASE_URL}/auth/register-with-invite?code={token}"
 
     return InvitationLinkResponse(
@@ -86,6 +85,8 @@ async def create_campaign(
     
     Data zakończenia musi być późniejsza niż data rozpoczęcia.
     Kampania zostanie automatycznie przypisana do `study_program_id` Starosty.
+    
+    Wymaga podania metody przydziału (assignment_method), domyślnie FCFS.
     """
     
     # waliduje czy starosta jest przypisany do rocznika (mimo ze link rejestracyjny przypisuje to dla pewnosci)
@@ -107,8 +108,9 @@ async def create_campaign(
         title=payload.title,
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
+        assignment_method=payload.assignment_method,
         creator_id=current_user.id, # starosta jako autor i admin kampanii
-        study_program_id=current_user.study_program_id
+        study_program_id=current_user.study_program_id,
     )
 
     db.add(new_campaign)
@@ -127,7 +129,8 @@ async def create_campaign(
         title=new_campaign.title,
         starts_at=new_campaign.starts_at,
         ends_at=new_campaign.ends_at,
-        is_active=is_active_now
+        is_active=is_active_now,
+        assignment_method=new_campaign.assignment_method
     )
     
 @router.post("/campaigns/{campaign_id}/groups", response_model=BulkGroupResponse)
@@ -278,6 +281,8 @@ async def update_campaign(
     """
     Edycja danych kampanii (tytuł, daty).
     Pozwala na częściową aktualizację kampanii (np. zmianę samego tytułu lub przedłużenie czasu zapisów).
+    Jeśli zmienisz `assignment_method`, to przy następnym uruchomieniu `resolve` 
+    system automatycznie wykryje zmianę i przeliczy wyniki na nowo.
     """
     # pobierz kampanię z bazy
     campaign = db.get(RegistrationCampaign, campaign_id)
@@ -289,7 +294,6 @@ async def update_campaign(
         raise HTTPException(status_code=403, detail="To nie Twoja kampania.")
 
     # logika aktualizacji (z validation dat)
-    
     # przygotuj dane do zmiany (odrzucamy to co jest None w payloadzie)
     update_data = payload.model_dump(exclude_unset=True)
     
@@ -321,7 +325,8 @@ async def update_campaign(
         title=campaign.title,
         starts_at=campaign.starts_at,
         ends_at=campaign.ends_at,
-        is_active=is_active_now
+        is_active=is_active_now,
+        assignment_method=campaign.assignment_method
     )
 
 
@@ -346,7 +351,7 @@ async def update_group(
     if not campaign or campaign.creator_id is None:
         raise HTTPException(status_code=404, detail="Błąd spójności danych (brak kampanii).")
 
-    # 3. sprawdź uprawnienia (czy Starosta jest właścicielem kampanii, do której należy grupa)
+    # sprawdź uprawnienia (czy starosta jest właścicielem kampanii, do której należy grupa)
     if campaign.creator_id != current_user.id:
         raise HTTPException(status_code=403, detail="Brak uprawnień.")
 
@@ -369,4 +374,71 @@ async def update_group(
         }
     }
     
+
+@router.post("/campaigns/{campaign_id}/resolve")
+async def resolve_campaign(
+    campaign_id: int,
+    current_user: CurrentAdmin,
+    db: SessionDep,
+    force: bool = False # mozliwosc wymuszenia ponownego przelosowania
+):
+    """
+    Uruchomienie algorytmu przydziału,
+    Zamyka zapisy i rozdziela studentów do grup na podstawie ich priorytetów oraz czasu wysłania wniosku.
     
+    Jeżeli assignment_method zostanie zedytowane po pomyślnym resolve'owaniu to zadziała od nowa algorytm przydzielania.
+    A jeżeli last_resolved_method != None lub force == false to nie przydziela studentow od nowa tylko przechodzi dalej
+    """
+     # pobierz kampanie z db
+    campaign = db.get(RegistrationCampaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
+
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Brak uprawnień.")
+
+    # check czy metoda losowania w bazie jest taka sama jak ta, którą ostatnio liczyliśmy
+    if not force and campaign.last_resolved_method == campaign.assignment_method:
+        return {
+            "message": "Wyniki są już aktualne dla wybranej metody.",
+            "detail": f"Ostatnio użyto metody: {campaign.last_resolved_method}. Zmień metodę lub użyj flagi force=true.",
+            "status": "skipped" # informacja dla frontendu że nic się nie zmieniło
+        }
+
+    # uruchomienie algorytmu losowania 
+    # (tylko jeśli last_resolved_method i assignment_method są różne lub force=True)
+    try:
+        stats = resolve_campaign_logic(db, campaign)
+        
+        # zapis stanu do db
+        campaign.last_resolved_method = campaign.assignment_method
+        
+        # campaign.is_active = False 
+        
+        db.add(campaign)
+        db.commit()
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Błąd algorytmu: {e}")
+        raise HTTPException(status_code=500, detail="Wystąpił błąd algorytmu.")
+
+    return {
+        "message": "Algorytm zakończony pomyślnie.",
+        "stats": stats,
+        "new_method_applied": campaign.assignment_method
+    }   
+    
+
+
+@router.post("/campaigns/{campaign_id}/download")
+async def download_campaign_results(
+    campaign_id: int,
+    current_user: CurrentAdmin,
+    db: SessionDep
+):
+    """
+    Pobranie tabelki w excelu z przydziałem do grup w danej kampanii.
+    UNINPLEMNETED YET
+    """
+    pass

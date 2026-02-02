@@ -12,7 +12,10 @@ from app.models.models import User
 settings = get_settings()
 
 # typ autoryzacji aplikacji, w swagger (localhost:8000/docs) mozna uzyc authorize wklejajac token jwt
+# jwt bearer token, standard oAuth2
 security = HTTPBearer()
+
+#region funkcje sprawdzajace poziom autoryzacji 
 
 # zezwoli na dostep tylko zalogowanemu userowi dowolnej roli
 async def get_current_user(
@@ -53,7 +56,6 @@ async def get_current_user(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
-# funkcje sprawdzajace poziom autoryzacji 
 
 # zezwala na dostep tylko adminowi
 async def get_current_admin(user: CurrentUser) -> User:
@@ -76,3 +78,5 @@ async def get_current_student(user: CurrentUser) -> User:
 # skróty typów
 CurrentAdmin = Annotated[User, Depends(get_current_admin)]
 CurrentStudent = Annotated[User, Depends(get_current_student)]
+
+#endregion

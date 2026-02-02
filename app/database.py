@@ -15,7 +15,7 @@ settings = get_settings()
 
 engine = create_engine(
     settings.DATABASE_URL,
-    echo=True, # zakomentuj zeby nie bylo logów z bazy danych
+    # echo=True, # zakomentuj zeby nie bylo logów z bazy danych
     pool_pre_ping=True,
 )
 

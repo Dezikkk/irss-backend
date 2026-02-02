@@ -51,7 +51,7 @@ async def create_test_user(
     Zwraca token JWT bearer potrzebny do autoryzacji
     """
     
-    # 1. Ogarnij rocznik (musi być, żeby cokolwiek działało)
+    # ogarnij rocznik (musi być, żeby cokolwiek działało)
     program = db.exec(
         select(StudyProgram).where(col(StudyProgram.name) == payload.program_name)
     ).first()
@@ -81,7 +81,7 @@ async def create_test_user(
     else:
         # jesli user juz istnieje to tylko aktualizujemy mu rolę/rocznik dla wygody
         user.role = payload.role
-        user.study_program_id = program.id # type: ignore
+        user.study_program_id = program.id
         db.add(user)
         db.commit()
         db.refresh(user)

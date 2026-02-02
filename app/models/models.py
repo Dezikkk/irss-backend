@@ -15,6 +15,11 @@ class RegistrationStatus(str, enum.Enum):
     ASSIGNED = "assigned"     # algorytm przydzielił studenta do tej grupy
     REJECTED = "rejected"     # student odrzucony bo np. braklo miejsc
 
+# Enum metod przydziału
+class AssignmentMethod(str, enum.Enum):
+    FCFS = "fcfs"             # Kto pierwszy ten lepszy (Time + Priorities)
+    LOTTERY = "lottery"       # Losowanie kolejności (Random + Priorities)
+    RANDOM = "random"         # Totalna losowość (Ignoruje priorytety, przydziela gdzie popadnie)
 
 # STUDY PROGRAMS (roczniki/kierunki)
 class StudyProgram(SQLModel, table=True):
@@ -99,11 +104,13 @@ class RegistrationCampaign(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     creator_id: Optional[int] = Field(default=None, foreign_key="users.id") #id starosty tworzacego kampanie
     study_program_id: int = Field(foreign_key="study_programs.id") # id kierunku ktory ma sie tu zapisywac
-    title: str # np. Cyberbezpieczenstwo stacjonarnie rok 3 - rekrutacja 
+    title: str # np. CYB-STA-2 - zima 2026
     starts_at: datetime
     ends_at: datetime
     access_code: Optional[str] = Field(default=None) # Opcjonalne hasło
     is_active: bool = Field(default=True) # czy rekru jeszcze aktywna
+    assignment_method: AssignmentMethod = Field(default=AssignmentMethod.FCFS) # metoda losowania
+    last_resolved_method: AssignmentMethod | None = Field(default=None)
 
     # Relacje
     creator: Optional[User] = Relationship(back_populates="created_campaigns")

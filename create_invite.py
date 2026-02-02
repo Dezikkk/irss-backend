@@ -1,5 +1,6 @@
 import secrets
 from datetime import datetime, timedelta
+import sys
 from sqlmodel import Session, select
 
 from app.database import engine 
@@ -51,11 +52,15 @@ def create_admin_link(program_name: str):
 if __name__ == "__main__":
     print("\n--- GENERATOR ZAPROSZEŃ DLA STAROSTÓW ---")
     
-    kierunek = input("Nazwa kierunku (np. Informatyka): ").strip()
-    tryb = input("Tryb (np. Stacjonarnie / Zaocznie): ").strip()
+    kierunek = input("Nazwa kierunku (np. INF): ").strip()
+    tryb = input("Tryb (np. STA / ZAO): ").strip()
     rok = input("Rok (np. 1): ").strip()
-
-    full_name = f"{kierunek.title()} {tryb.title()} Rok {rok}"
+    
+    if not kierunek or not tryb or not rok:
+        print("Błąd: kierunek, tryb i rok nie mogą być puste.")
+        sys.exit(1)
+    
+    full_name = f"{kierunek.upper()}-{tryb.upper()}-{rok}"
     
     print(f"\nGeneruję dla nazwy: '{full_name}'...")
     

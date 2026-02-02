@@ -22,11 +22,18 @@
     - [x] validation for unique priorities (no cheating)
     - [x] logic to prevent double signups (one submission per campaign)
     - [ ] fix the N+1 problem in /available-campaigns
-- [ ] adding debug mode that enables a dangerous test endpoint, which can be enabled in .env
-- [ ] campaign finish management
-    - [ ] assigning students to groups according to their priorities
-        - [ ] doing it by random or first come first served roles
+- [x] campaign finish management
+    - [x] assigning students to groups according to specified methods:
+        - [x] FCFS (priorities + time of applications)
+        - [x] lottery (priorities and luck)
+        - [x] random (ignore preferences) 
     - [ ] generating excel results
+- [ ] adding debug mode that enables a dangerous test endpoints, which can be enabled in .env
+- [ ] using a throttling mechanism for smtp to ensure the limits are not exceeded (30 mails/min in outlook's case)
+- [ ] smtp error handling
+- [ ] transferring SMTP to the university's service account (i wish)
+- [ ] add rate limiting and other protection methods if needed
+- [ ] pretty readme
 - [ ] docker and tests maybe later idk
 
 
@@ -45,6 +52,10 @@ The purpose of each folder in the project tree is the following:
 > Change ".env.example" filename to ".env" and fill in what is needed(DB and SMTP credentials)
 > Now, all you need to do is run script in powershell "run.ps1". 
 It will create a virtual enviorment, download all depedencies and start server :D
+
+Tested on:
+> Python: 3.12.10
+> PostgreSQL: 18.1
 
 tip: You can access the auto-generated docs through http://127.0.0.1:8000/docs
 It show full list of endpoints and payloads (genuinely useful)
@@ -89,6 +100,6 @@ Detailed description of every endpoint is avaiable on localhost:8000/docs
 
 5. `registration_campaigns`: Registration Campaigns opened by the Admin (e.g., “Rekrutacja zima 2026”).
 
-6. `registration_groups`: Konkretne przedmioty/sloty w ramach kampanii (np. "DevOps gr. 1").
+6. `registration_groups`: Specific subjects/slots within the campaign (e.g., “DevOps gr. 1”).
 
 7. `registrations`: Connection between the Student and the Group (registration request). The student's preferences are saved here.

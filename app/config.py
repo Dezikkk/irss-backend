@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     APP_NAME: str
     BASE_URL: str
 
+# export settingsow bez tworzenia za kazdym razem obiektu Settings
 @lru_cache
 def get_settings():
     return Settings() # type: ignore

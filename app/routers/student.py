@@ -7,7 +7,6 @@ from sqlalchemy import func
 from app.database import SessionDep
 from app.core.dependencies import CurrentUser
 from app.models.models import (
-    RegistrationCampaign, 
     RegistrationGroup, 
     Registration, 
     RegistrationStatus,

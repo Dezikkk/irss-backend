@@ -2,21 +2,19 @@ from typing import List
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 
-from app.models.models import UserRole
+from app.models.models import AssignmentMethod, UserRole
 
-# --- MODELE AUTORYZACJI ---
+#region --- MODELE AUTORYZACJI ---
 
 class EmailRequest(BaseModel):
     """Służy do wysyłania prośby o Magic Link (login)"""
     email: EmailStr
 
-#
 class MagicLinkResponse(BaseModel):
     """Standardowa odpowiedź po wysłaniu maila z tokenem"""
     message: str
     detail: str
 
-#    
 class RegisterWithInviteRequest(BaseModel):
     """Dane potrzebne do założenia konta przez studenta za pomocą kodu od Starosty"""
     email: EmailStr
@@ -26,8 +24,10 @@ class TokenResponse(BaseModel):
     """Zwracany po pomyślnej weryfikacji Magic Linku; zawiera JWT"""
     access_token: str
     token_type: str = "bearer" # Standard OAuth2
-    
-# --- MODELE ZAPROSZEŃ ---
+
+#endregion
+
+#region --- MODELE ZAPROSZEŃ ---
     
 class CreateStudentInviteRequest(BaseModel):
     """Parametry konfiguracyjne dla nowego linku zaproszeniowego"""
@@ -41,13 +41,16 @@ class InvitationLinkResponse(BaseModel):
     expires_at: datetime
     max_uses: int
 
-# --- KAMPANIE I GRUPY (DANE ADMINISTRACYJNE) ---
+#endregion
+
+#region --- KAMPANIE I GRUPY (DANE ADMINISTRACYJNE) ---
 
 class CampaignCreateRequest(BaseModel):
     """Tworzenie nowej kampanii zapisów przez Starostę"""
     title: str
     starts_at: datetime
     ends_at: datetime
+    assignment_method: AssignmentMethod = AssignmentMethod.FCFS # domyslnie kto pierwszy ten lepszy
 
 class CampaignResponse(BaseModel):
     """Podstawowe dane o kampanii zwracane w listach lub po utworzeniu"""
@@ -56,6 +59,7 @@ class CampaignResponse(BaseModel):
     starts_at: datetime
     ends_at: datetime
     is_active: bool
+    assignment_method: AssignmentMethod
     
 class GroupCreateRequest(BaseModel):
     """Pojedynczy rekord grupy tworzony wewnątrz kampanii"""
@@ -92,7 +96,9 @@ class CampaignDetailResponse(BaseModel):
     total_registered_students: int # Suma wszystkich zapisanych userow
     groups: List[GroupStatsResponse] # Lista grup ze statystykami
     
-# --- WIDOKI DLA STUDENTA ---
+#endregion
+    
+#region --- WIDOKI DLA STUDENTA ---
 
 class StudentGroupView(BaseModel):
     """Widok grupy dla studenta (pokazuje popularność zamiast liczby wolnych miejsc)"""
@@ -131,17 +137,21 @@ class CampaignRegistrationRequest(BaseModel):
             raise ValueError("Priorytety muszą być unikalne (nie możesz dać tego samego numeru dwóm grupom).")
         
         return v
+
+#endregion
     
-# --- MODELE AKTUALIZACJI (PATCH - EDYCJA CZĘŚCIOWA) ---    
+#region --- MODELE AKTUALIZACJI  ---
     
 class CampaignUpdateRequest(BaseModel):
     """Służy do edycji kampanii; wszystkie pola są opcjonalne"""
     title: str | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+    assignment_method: AssignmentMethod | None = None
 
 class GroupUpdateRequest(BaseModel):
     """Służy do edycji grupy; wszystkie pola są opcjonalne"""
     name: str | None = None
     limit: int | None = Field(default=None, gt=0, description="Nowy limit miejsc")
     
+#endregion
