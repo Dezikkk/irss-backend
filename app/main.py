@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
 from app.routers import auth, users, admin, student, debug
@@ -20,6 +21,24 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
     )
+
+origins = [
+    "http://localhost", 
+    "https://localhost", 
+    "http://localhost:8080",
+    "https://localhost:8080",
+    "http://127.0.0.1",
+    "https://127.0.0.1",
+    # W produkcji tutaj daj domenę np. https://zapisy.uken.pl czy jakie to tam bedzie
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins, 
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH"], # Pozwalamy na GET, POST, PATCH
+    allow_headers=["*"],
+)
 
 # ROUTERS
 app.include_router(auth.router)
