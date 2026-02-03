@@ -30,7 +30,7 @@ async def info():
         "SMTP_PASSWORD": settings.SMTP_PASSWORD,
         "SMTP_FROM": settings.SMTP_FROM,
         "APP_NAME": settings.APP_NAME,
-        "BASE_URL": settings.BASE_URL
+        "BACKEND_URL": settings.BACKEND_URL
     }
     
     

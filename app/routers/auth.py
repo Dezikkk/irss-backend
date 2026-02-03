@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlmodel import select
 
 from app.database import SessionDep
@@ -160,7 +161,9 @@ async def request_magic_link(
 @router.get("/verify", response_model=TokenResponse)
 async def verify_token(token: str, db: SessionDep):
     """
-    Punkt końcowy dla linków z wiadomości e-mail. Weryfikuje token i zwraca JWT Access Token.
+    Weryfikuje link z maila. 
+    Jeśli OK -> Przekierowuje na frontend z tokenem w URL po znaku # (hash).
+    Jeśli BŁĄD -> Przekierowuje na stronę błędu.
     
     Po pomyślnej weryfikacji token zostaje oznaczony jako zużyty (`is_used = True`).
     Zwrócony token JWT należy przesyłać w nagłówku `Authorization: Bearer <token>` 
@@ -188,13 +191,15 @@ async def verify_token(token: str, db: SessionDep):
 
     # generuj jwt
     access_token_expires = timedelta(hours=settings.SESSION_EXPIRE_HOURS)
-    
     access_token = create_access_token(
         data={"sub": str(user.id)},  # id usera zakodowane
         expires_delta=access_token_expires
     )
     
-    return TokenResponse(
-        access_token=access_token,
-    )
+    # return TokenResponse(
+    #     access_token=access_token,
+    # )
     
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/auth_callback.html#access_token={access_token}"
+    )

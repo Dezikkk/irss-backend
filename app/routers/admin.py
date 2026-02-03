@@ -7,7 +7,7 @@ from sqlmodel import select, col
 from app.config import get_settings
 from app.core.assignment import resolve_campaign_logic
 from app.database import SessionDep
-from app.core.dependencies import CurrentAdmin, CurrentUser 
+from app.core.dependencies import CurrentAdmin
 from app.models.models import (
     Invitation, Registration, RegistrationCampaign, RegistrationGroup, 
     RegistrationStatus, UserRole
@@ -61,7 +61,7 @@ async def create_student_invite(
     
     # TODO: obecnie link nie bedzie działał bo register-with-invite przyjmuje POST. trzeba tam wkleic endpoint frontendu
     # jak bedzie frontend to dokonczyc zeby poprosic usera o email i dalej wysylac posta na register-with-invite
-    full_link = f"{settings.BASE_URL}/auth/register-with-invite?code={token}"
+    full_link = f"{settings.FRONTEND_URL}/register?code={token}"
 
     return InvitationLinkResponse(
         invite_link=full_link,

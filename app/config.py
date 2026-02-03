@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     SMTP_FROM: str
     APP_NAME: str
-    BASE_URL: str
+    BACKEND_URL: str
+    FRONTEND_URL: str
 
 # export settingsow bez tworzenia za kazdym razem obiektu Settings
 @lru_cache

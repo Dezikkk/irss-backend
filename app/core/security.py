@@ -18,7 +18,7 @@ def generate_magic_token() -> str:
     return secrets.token_urlsafe(32)
 
 async def send_magic_link_email(email: str, token: str):
-    magic_link = f"{settings.BASE_URL}/auth/verify?token={token}"
+    magic_link = f"{settings.BACKEND_URL}/auth/verify?token={token}"
     
     message = EmailMessage()
     message["From"] = settings.SMTP_FROM
