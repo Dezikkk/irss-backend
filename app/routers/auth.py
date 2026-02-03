@@ -11,7 +11,7 @@ from app.core.security import (
     create_access_token, generate_magic_token, 
     send_magic_link_email, validate_uni_email
 )
-from app.models.models import AuthToken, Invitation, User
+from app.models.models import AuthToken, Invitation, RegistrationCampaign, User
 from app.config import get_settings
 
 settings = get_settings()
@@ -25,7 +25,7 @@ async def register_with_invite(
 ):
     """
     Tworzy konto użytkownika na podstawie kodu zaproszenia wygenerowanego przez Starostę. 
-    System automatycznie przypisuje rolę i kierunek studiów zdefiniowane w zaproszeniu.
+    System automatycznie przypisuje rolę i kampanię zdefiniowane w zaproszeniu.
     """
     email = payload.email
     code = payload.invite_code
@@ -37,39 +37,65 @@ async def register_with_invite(
             detail=f"Wymagany mail w domenie {settings.ALLOWED_DOMAINS}"
         )
 
-    # sprawdz czy user z taki mailem istnieje
-    existing_user = db.exec(select(User).where(User.email == email)).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=400, 
-            detail="Konto z tym mailem już istnieje. Użyj zwykłego logowania."
-        )
-
-    # sprawdz kod zapro w bazie
+    # pobranie i walidacja zapro
     invite = db.exec(select(Invitation).where(Invitation.token == code)).first()
-    
     if not invite:
         raise HTTPException(status_code=404, detail="Nieprawidłowy kod zaproszenia.")
     
     if not invite.is_valid:
         raise HTTPException(status_code=400, detail="Ten kod zaproszenia wygasł lub został w pełni wykorzystany.")
 
-    # tworz nowego usera i dodaj do db(role bierze z zapro)
-    new_user = User(
-        email=email,
-        role=invite.target_role,                 
-        study_program_id=invite.target_study_program_id 
-    )
-    db.add(new_user)
+    # walidacja kampanii (jeśli kod dotyczy kampanii)
+    if invite.target_campaign_id is not None:
+        campaign_exists = db.get(RegistrationCampaign, invite.target_campaign_id)
+        if not campaign_exists:
+            raise HTTPException(status_code=404, detail="Kampania z zaproszenia już nie istnieje.")
 
-    # zaktualizuj licznik zaproszenia
+    # sprawdź czy user już istnieje
+    user = db.exec(select(User).where(User.email == email)).first()
+
+    if user:
+    # --- SCENARIUSZ A: UPDATE ISTNIEJĄCEGO USERA ---
+        
+        # Logika: Jeśli to link do kampanii (student), a user tej kampanii nie ma -> dodaj.
+        if invite.target_campaign_id is not None:
+            # sprawdź duplikaty w liście
+            if invite.target_campaign_id not in user.allowed_campaign_ids:
+                current_campaigns = list(user.allowed_campaign_ids)
+                current_campaigns.append(invite.target_campaign_id)
+                user.allowed_campaign_ids = current_campaigns
+                
+                db.add(user)
+                message_detail = "Zaktualizowano Twoje konto o dostęp do nowego rocznika."
+            else:
+                message_detail = "Masz już dostęp do tej kampanii. Logowanie..."
+        else:
+            message_detail = "Konto już istnieje. Logowanie..."
+
+    else:
+    # --- SCENARIUSZ B: TWORZENIE NOWEGO USERA ---
+        
+        # przygotuj listę kampanii
+        initial_campaigns = []
+        if invite.target_campaign_id is not None:
+            initial_campaigns.append(invite.target_campaign_id)
+
+        new_user = User(
+            email=email,
+            role=invite.target_role,                 
+            allowed_campaign_ids=initial_campaigns 
+        )
+        db.add(new_user)
+        message_detail = "Konto utworzone pomyślnie!"
+
+    # podbij licznik uzycia zaproszenia
     invite.current_uses += 1
     db.add(invite)
     
     # zapisz wszystko w bazie
     db.commit() 
 
-    # wyslij magic link
+    # generuj i wyslij magic link
     token = generate_magic_token()
     expires_at = datetime.now() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
     
@@ -84,8 +110,8 @@ async def register_with_invite(
     await send_magic_link_email(email, token)
 
     return MagicLinkResponse(
-        message="Konto utworzone pomyślnie!",
-        detail=f"Witaj w systemie! Na adres {email} wysłaliśmy link do pierwszego logowania."
+        message="Sukces!",
+        detail=f"{message_detail} Na adres {email} wysłaliśmy link logujący."
     )
 
 # logowanie (dla osób które już mają konto)

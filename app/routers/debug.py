@@ -4,7 +4,7 @@ from sqlmodel import select, col
 
 from app.config import get_settings
 from app.database import SessionDep
-from app.models.models import User, UserRole, StudyProgram
+from app.models.models import User, UserRole
 from app.core.security import create_access_token
 
 settings = get_settings()
@@ -37,7 +37,7 @@ async def info():
 class DebugUserRequest(BaseModel):
     email: str
     role: UserRole = UserRole.STUDENT
-    program_name: str = "Informatyka Testowa"
+    campaign_id: int | None = None
     
 @router.post("/create-user")
 async def create_test_user(
@@ -46,55 +46,50 @@ async def create_test_user(
 ):
     """
     Tworzy usera z pominięciem emaili.
-    Potrafi jeszcze aktualizować isniejącego usera.
-    Automatycznie tworzy lub przypisuje StudyProgram.
-    Zwraca token JWT bearer potrzebny do autoryzacji
+    Potrafi aktualizować istniejącego usera (zmienia rolę i dodaje dostęp do kampanii).
+    Zwraca token JWT bearer potrzebny do autoryzacji.
     """
     
-    # ogarnij rocznik (musi być, żeby cokolwiek działało)
-    program = db.exec(
-        select(StudyProgram).where(col(StudyProgram.name) == payload.program_name)
-    ).first()
-    
-    # jak nie ma takiego study programu to utworz nowy
-    if not program:
-        program = StudyProgram(name=payload.program_name)
-        db.add(program)
-        db.commit()
-        db.refresh(program)
-    
-    # sprawdz czy user istnieje
+# sprawdz czy user istnieje
     user = db.exec(
         select(User).where(col(User.email) == payload.email)
     ).first()
     
     if not user:
         # tworzymy nowego usera
+        initial_campaigns = []
+        if payload.campaign_id is not None:
+            initial_campaigns.append(payload.campaign_id)
+
         user = User(
             email=payload.email,
             role=payload.role,
-            study_program_id=program.id # dodajemy go do study programu
+            allowed_campaign_ids=initial_campaigns
         )
         db.add(user)
         db.commit()
         db.refresh(user)
     else:
-        # jesli user juz istnieje to tylko aktualizujemy mu rolę/rocznik dla wygody
-        user.role = payload.role
-        user.study_program_id = program.id
+        # jesli user juz istnieje to tylko aktualizujemy mu rolę
+        # Jeśli podano campaign_id, dodajemy go do listy (jeśli go tam nie ma)
+        if payload.campaign_id is not None:
+            if payload.campaign_id not in user.allowed_campaign_ids:
+                current_ids = list(user.allowed_campaign_ids)
+                current_ids.append(payload.campaign_id)
+                user.allowed_campaign_ids = current_ids
+
         db.add(user)
         db.commit()
         db.refresh(user)
 
-    # generuje token od razu, nie trzeba na mailu klikac
     if user.id is None:
          return {"error": "User ID is missing"}
-
+    
     access_token = create_access_token(data={"sub": str(user.id)})
     
     return {
         "message": f"Stworzono/Zaktualizowano usera: {user.email} [{user.role}]",
         "access_token": access_token,
         "token_type": "bearer",
-        "study_program": program.name
+        "campaigns": user.allowed_campaign_ids
     }

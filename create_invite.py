@@ -1,67 +1,118 @@
 import secrets
-from datetime import datetime, timedelta
 import sys
+from datetime import datetime, timedelta
+from typing import Optional
+
 from sqlmodel import Session, select
 
+# Pamiętaj o poprawnych importach ze swojego projektu
 from app.database import engine 
-from app.models.models import Invitation, StudyProgram, UserRole
+from app.models.models import Invitation, UserRole, RegistrationCampaign
 
-# TODO rozwinac to pozniej zeby z excela tworzylo całą liste zaproszen
+def get_input_number(prompt: str, default: Optional[int] = None) -> int:
+    """Pomocnicza funkcja do pobierania liczby od użytkownika."""
+    while True:
+        user_input = input(prompt).strip()
+        if not user_input and default is not None:
+            return default
+        if user_input.isdigit():
+            return int(user_input)
+        print("Błąd: Proszę podać liczbę.")
 
-def create_admin_link(program_name: str):
-    """
-    Tworzy rocznik (jeśli nie istnieje) i generuje dla niego link Starosty.
-    """
+def generate_invitation():
+    print("\n--- KREATOR ZAPROSZEŃ ---")
+
     with Session(engine) as session:
-        # 1. Znajdź lub stwórz rocznik
-        statement = select(StudyProgram).where(StudyProgram.name == program_name)
-        program = session.exec(statement).first()
-
-        if not program:
-            print(f"Rocznik '{program_name}' nie istnieje. Tworzę nowy...")
-            program = StudyProgram(name=program_name)
-            session.add(program)
-            session.commit()
-            session.refresh(program)
+        # 1. WYBÓR ROLI
+        print("\nWybierz rolę użytkownika:")
+        print("1. Student")
+        print("2. Starosta (Admin)")
         
-        # 2. Generuj bezpieczny token
+        while True:
+            choice = input("Twój wybór (1/2): ").strip()
+            if choice == "1":
+                selected_role = UserRole.STUDENT
+                break
+            elif choice == "2":
+                selected_role = UserRole.ADMIN
+                break
+            else:
+                print("Niepoprawny wybór. Wpisz 1 lub 2.")
+
+        # 2. LOGIKA KAMPANII (Tylko dla Studenta)
+        selected_campaign_id = None
+        
+        if selected_role == UserRole.STUDENT:
+            print("\n--- WYBÓR KAMPANII DLA STUDENTA ---")
+            # Pobieramy aktywne kampanie, żeby wyświetlić listę
+            campaigns = session.exec(select(RegistrationCampaign).where(RegistrationCampaign.is_active == True)).all()
+            
+            if not campaigns:
+                print("BŁĄD: W bazie nie ma żadnych aktywnych kampanii.")
+                print("Nie można wygenerować linku dla studenta.")
+                print("Najpierw wygeneruj link dla Starosty i stwórz kampanię.")
+                return
+
+            print(f"Dostępne kampanie ({len(campaigns)}):")
+            for c in campaigns:
+                print(f"[{c.id}] {c.title} (Start: {c.starts_at.date()})")
+            
+            # Pętla wyboru ID
+            while True:
+                c_id = get_input_number("Podaj ID kampanii: ")
+                # Sprawdź czy takie ID istnieje na liście
+                if any(c.id == c_id for c in campaigns):
+                    selected_campaign_id = c_id
+                    break
+                else:
+                    print("Błąd: Nie ma kampanii o takim ID.")
+        
+        else:
+            # Dla Starosty nie przypisujemy kampanii
+            print("\n(Dla Starosty pomijam wybór kampanii)")
+            selected_campaign_id = None
+
+        # 3. LICZBA UŻYĆ
+        print("\n--- KONFIGURACJA LINKU ---")
+        if selected_role == UserRole.ADMIN:
+            default_uses = 1
+        else:
+            default_uses = 100
+            
+        max_uses = get_input_number(f"Ile razy link może być użyty? (domyślnie {default_uses}): ", default=default_uses)
+
+        # 4. GENEROWANIE
         token = secrets.token_urlsafe(16)
         
-        # 3. Zapisz zaproszenie w bazie
         invite = Invitation(
             token=token,
-            target_role=UserRole.ADMIN,  # Ten link nadaje uprawnienia STAROSTY
-            target_study_program_id=program.id, # type: ignore
-            max_uses=1, # Link jednorazowy
-            expires_at=datetime.now() + timedelta(days=7)
+            target_role=selected_role,
+            target_campaign_id=selected_campaign_id,
+            max_uses=max_uses,
+            current_uses=0,
+            expires_at=datetime.now() + timedelta(days=7) # Ważny 7 dni
         )
 
         session.add(invite)
         session.commit()
 
-        # 4. Wyświetl wynik
+        # 5. WYNIK
+        role_name = "STAROSTA" if selected_role == UserRole.ADMIN else "STUDENT"
+        
         print("\n" + "="*60)
-        print(f"Wygenerowano link dla STAROSTY.")
-        print(f"Rocznik: {program.name}")
-        print(f"Kod:     {token}")
+        print(f"SUKCES! Wygenerowano zaproszenie.")
+        print(f"Rola:        {role_name}")
+        if selected_campaign_id:
+            print(f"Kampania ID: {selected_campaign_id}")
+        print(f"Liczba użyć: {max_uses}")
+        print(f"Wygasa:      {invite.expires_at}")
         print("-" * 60)
-        print(f"URL: http://localhost:8000/auth/register-with-invite")
-        print(f"Payload: {{ \"email\": \"twoj_email\", \"invite_code\": \"{token}\" }}")
+        print(f"TOKEN: {token}")
+        print(f"LINK:  http://localhost:8000/auth/register?token={token}")
         print("="*60 + "\n")
 
 if __name__ == "__main__":
-    print("\n--- GENERATOR ZAPROSZEŃ DLA STAROSTÓW ---")
-    
-    kierunek = input("Nazwa kierunku (np. INF): ").strip()
-    tryb = input("Tryb (np. STA / ZAO): ").strip()
-    rok = input("Rok (np. 1): ").strip()
-    
-    if not kierunek or not tryb or not rok:
-        print("Błąd: kierunek, tryb i rok nie mogą być puste.")
-        sys.exit(1)
-    
-    full_name = f"{kierunek.upper()}-{tryb.upper()}-{rok}"
-    
-    print(f"\nGeneruję dla nazwy: '{full_name}'...")
-    
-    create_admin_link(full_name)
+    try:
+        generate_invitation()
+    except KeyboardInterrupt:
+        print("\nPrzerwano operację.")

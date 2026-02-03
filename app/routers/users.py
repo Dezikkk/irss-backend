@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 from fastapi import APIRouter
 from sqlmodel import select, col
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import SessionDep
@@ -32,7 +33,6 @@ async def get_dashboard(current_user: CurrentUser, db: SessionDep):
         "id": current_user.id,
         "email": current_user.email,
         "role": current_user.role,
-        "program_name": current_user.study_program.name if current_user.study_program else "Brak przypisania"
     }
 
     if current_user.role == "starosta":
@@ -63,55 +63,77 @@ async def get_available_campaigns(
     db: SessionDep
 ):
     """
-    Zwraca kampanie (wraz z grupami) dostępne dla rocznika studenta.
+    Zwraca kampanie (wraz z grupami) i statusem na podstawie allowed_campaign_ids przypisanych do studenta.
     Pokazuje też kampanie które sie zakonczyly i nie rozpoczeły oraz status tekstowy.
     """
     now = datetime.now()
+    
+    if not current_user.allowed_campaign_ids:
+        return []
 
+    # 1. Pobieranie kampanii
     statement = (
         select(RegistrationCampaign)
-        .where(col(RegistrationCampaign.study_program_id) == current_user.study_program_id)
-        .where(col(RegistrationCampaign.is_active) == True)
-        # .where(col(RegistrationCampaign.ends_at) >= now) # zeby bylo widac tez zakonczone kampaniee
+        .where(col(RegistrationCampaign.id).in_(current_user.allowed_campaign_ids)) 
+        .where(RegistrationCampaign.is_active == True)
+        .options(selectinload(getattr(RegistrationCampaign, "groups"))) 
     )
     
     campaigns = db.exec(statement).all()
+
+    if not campaigns:
+        return []
+
+    # 2. Zbieramy ID wszystkich grup
+    all_group_ids = [
+        group.id 
+        for campaign in campaigns 
+        for group in campaign.groups 
+        if group.id is not None
+    ]
+
+    # 3. Batch Query: Liczymy "jedynki"
+    counts_statement = (
+        select(Registration.group_id, func.count(col(Registration.id)))
+        .where(col(Registration.group_id).in_(all_group_ids))
+        .where(Registration.priority == 1)
+        .where(Registration.status != RegistrationStatus.REJECTED)
+        .group_by(col(Registration.group_id))  # Tutaj col() naprawia błąd w group_by
+    )
     
+    counts_result = db.exec(counts_statement).all()
+    
+    # NAPRAWA: Dict jest teraz zaimportowany
+    priority_map: Dict[int, int] = {row[0]: row[1] for row in counts_result}
+
+    # 4. Budowanie odpowiedzi
     response = []
-    
+
     for campaign in campaigns:
         if campaign.id is None:
             continue
         
-        # logika statusu
         if now < campaign.starts_at:
             status_msg = "Wkrótce"
         elif now > campaign.ends_at:
             status_msg = "Zakończone"
         else:
             status_msg = "Aktywne"
-        
-        # budujemy listę grup z obliczonymi wolnymi miejscami
+
         groups_view = []
         for group in campaign.groups:
             if group.id is None:
                 continue
-            
-            # liczenie popularnosci(chetnych na 1 wybór)
-            priority_ones = db.exec(
-                select(func.count(col(Registration.id)))
-                .where(col(Registration.group_id) == group.id)
-                .where(col(Registration.priority) == 1) # TYLKO PIERWSZE MIEJSCA
-                .where(col(Registration.status) != RegistrationStatus.REJECTED)
-            ).one()
-            
+
+            count = priority_map.get(group.id, 0)
+
             groups_view.append(StudentGroupView(
                 id=group.id,
                 name=group.name,
                 limit=group.limit,
-                first_priority_count=priority_ones 
+                first_priority_count=count 
             ))
-            
+
         response.append(StudentCampaignView(
             id=campaign.id, 
             title=campaign.title,

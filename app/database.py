@@ -6,9 +6,8 @@ from sqlalchemy_utils import database_exists, create_database
 from app.config import get_settings
 # TODO: zweryfikuj czy musi byc import by db wiedzialo co tworzyc
 from app.models.models import (
-    StudyProgram, User, AuthToken, 
-    RegistrationCampaign, RegistrationGroup, 
-    Registration, Invitation
+    User, AuthToken, RegistrationCampaign, 
+    RegistrationGroup, Registration, Invitation
 )
 
 settings = get_settings()

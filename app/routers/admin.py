@@ -25,28 +25,24 @@ router = APIRouter(prefix="/admin", tags=["Admin(Starosta)"])
 @router.post("/create-student-invite", response_model=InvitationLinkResponse)
 async def create_student_invite(
     payload: CreateStudentInviteRequest,
-    current_user: CurrentUser,
+    current_user: CurrentAdmin,
     db: SessionDep
 ):
     """
     Generuje link zaproszeniowy dla studentów z tego samego rocznika.
     Tylko dla STAROSTY.
     
-    Generuje link, który po przesłaniu studentom pozwala im na założenie konta bez ręcznej weryfikacji przez administratora systemu.
+    link, który po przesłaniu studentom pozwala im na założenie konta bez ręcznej weryfikacji przez administratora systemu.
     """
-    # sprawdź uprawnienia czy osoba tworząca jest starostą(student nie moze tworzyc zaproszen)
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=403,
-            detail="Brak uprawnień. Tylko starosta może generować zaproszenia."
-        )
-
-    if not current_user.study_program_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Nie jesteś przypisany do żadnego rocznika, więc nie możesz zapraszać."
-        )
-
+    
+    # sprawdź czy kampania istnieje i należy do tego starosty
+    campaign = db.get(RegistrationCampaign, payload.campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
+        
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Nie możesz zapraszać do kampanii, której nie stworzyłeś.")
+    
     # generuj token
     token = secrets.token_urlsafe(16)
     expires_at = datetime.now() + timedelta(days=payload.days_valid)
@@ -55,7 +51,7 @@ async def create_student_invite(
     invite = Invitation(
         token=token,
         target_role=UserRole.STUDENT,       # tworzymy studenta
-        target_study_program_id=current_user.study_program_id, # na tym samym roku co starota tworzacy zapro
+        target_campaign_id=payload.campaign_id,
         max_uses=payload.max_uses,
         expires_at=expires_at
     )
@@ -89,13 +85,6 @@ async def create_campaign(
     Wymaga podania metody przydziału (assignment_method), domyślnie FCFS.
     """
     
-    # waliduje czy starosta jest przypisany do rocznika (mimo ze link rejestracyjny przypisuje to dla pewnosci)
-    if not current_user.study_program_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Nie jesteś przypisany do żadnego rocznika, nie możesz stworzyć kampanii."
-        )
-    
     # walidajca dat
     if payload.ends_at <= payload.starts_at:
         raise HTTPException(
@@ -110,7 +99,6 @@ async def create_campaign(
         ends_at=payload.ends_at,
         assignment_method=payload.assignment_method,
         creator_id=current_user.id, # starosta jako autor i admin kampanii
-        study_program_id=current_user.study_program_id,
     )
 
     db.add(new_campaign)
@@ -123,6 +111,15 @@ async def create_campaign(
 
     if new_campaign.id is None:
         raise HTTPException(status_code=500, detail="Błąd zapisu kampanii do bazy danych")
+
+    # dodawanie nowej kampanii do listy usera zeby mogl accessowac
+    current_ids = list(current_user.allowed_campaign_ids)
+    if new_campaign.id not in current_ids:
+        current_ids.append(new_campaign.id)
+        current_user.allowed_campaign_ids = current_ids
+        
+        db.add(current_user)
+        db.commit()
 
     return CampaignResponse(
         id=new_campaign.id, 

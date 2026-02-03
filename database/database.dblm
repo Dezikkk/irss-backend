@@ -1,4 +1,4 @@
-// --- ENUMS ---
+// --- ENUMS (Słowniki) ---
 
 Enum UserRole {
   student
@@ -6,63 +6,53 @@ Enum UserRole {
 }
 
 Enum RegistrationStatus {
-  submitted // zgloszony wniosek
-  assigned // przydzielony
-  rejected // odrzucony
+  submitted // zgłoszony, czeka
+  assigned  // przydzielony
+  rejected  // odrzucony
 }
 
 Enum AssignmentMethod {
-  fcfs // Kto pierwszy ten lepszy
-  lottery // Losowanie kolejności
-  random // Totalna losowość
+  fcfs    // kto pierwszy ten lepszy
+  lottery // losowanie
+  random  // totalna losowość
 }
 
-// --- TABLES ---
-
-Table study_programs {
-  id int [pk, increment]
-  name varchar [unique, note: "np. Inf rok 1"]
-  description text [null]
-  is_active bool [default: true]
-}
+// --- TABELE ---
 
 Table users {
   id int [pk, increment]
-  email varchar [unique]
+  email varchar [unique, not null]
   role UserRole [default: 'student']
-  study_program_id int [ref: > study_programs.id, null]
-}
-
-Table invitations {
-  id int [pk, increment]
-  token varchar [unique]
-  target_role UserRole
-  target_study_program_id int [ref: > study_programs.id]
-  max_uses int [default: 1]
-  current_uses int [default: 0]
-  expires_at datetime
+  // Przechowuje listę ID, np. [1, 2, 5]
+  allowed_campaign_ids json [default: '[]'] 
 }
 
 Table auth_tokens {
   id int [pk, increment]
-  email varchar
-  token varchar [unique]
-  expires_at datetime
+  email varchar [not null]
+  token varchar [unique, not null]
+  expires_at datetime [not null]
   is_used bool [default: false]
   created_at datetime [default: `now()`]
-  
-  // Note: Brak sztywnego klucza obcego w kodzie, 
-  // ale logicznie powiązane z users.email
+}
+
+Table invitations {
+  id int [pk, increment]
+  token varchar [unique, not null]
+  target_role UserRole [not null]
+  target_campaign_id int [ref: > registration_campaigns.id]
+  max_uses int [default: 1]
+  current_uses int [default: 0]
+  expires_at datetime [not null]
 }
 
 Table registration_campaigns {
   id int [pk, increment]
   creator_id int [ref: > users.id, null] // Starosta
-  study_program_id int [ref: > study_programs.id]
-  title varchar
-  starts_at datetime
-  ends_at datetime
-  access_code varchar [null]
+  title varchar [not null]
+  starts_at datetime [not null]
+  ends_at datetime [not null]
+  access_code varchar [null, note: 'Opcjonalne hasło']
   is_active bool [default: true]
   assignment_method AssignmentMethod [default: 'fcfs']
   last_resolved_method AssignmentMethod [null]
@@ -70,9 +60,9 @@ Table registration_campaigns {
 
 Table registration_groups {
   id int [pk, increment]
-  campaign_id int [ref: > registration_campaigns.id]
-  name varchar // np. L1 - chmury
-  limit int
+  campaign_id int [ref: > registration_campaigns.id, note: 'Delete cascade']
+  name varchar [not null]
+  limit int [not null]
 }
 
 Table registrations {
@@ -83,7 +73,8 @@ Table registrations {
   status RegistrationStatus [default: 'submitted']
   created_at datetime [default: `now()`]
 
+  // Unique Constraint: Student nie może zapisać się 2x do tej samej grupy
   indexes {
-    (user_id, group_id) [unique, note: "uq_user_group_pref"]
+    (user_id, group_id) [unique]
   }
 }

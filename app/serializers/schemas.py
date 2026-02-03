@@ -31,6 +31,7 @@ class TokenResponse(BaseModel):
     
 class CreateStudentInviteRequest(BaseModel):
     """Parametry konfiguracyjne dla nowego linku zaproszeniowego"""
+    campaign_id: int
     max_uses: int = 100       # default 100 studentów i wazne tydzien
     days_valid: int = 7
 

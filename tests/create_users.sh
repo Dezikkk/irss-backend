@@ -1,57 +1,63 @@
 #!/bin/bash
 
-# pozwala wygenereowac duża ilosc testowych studentow jedną komendą
+# Skrypt pozwala wygenerować dużą ilość testowych studentów przypisanych do konkretnej kampanii
 
 # Sprawdzenie argumentów
-if [ -z "$1" ] || [ -z "$2" ]; then
-  echo "Użycie: ./create_users.sh <ilosc_uzytkownikow> <nazwa_programu>"
-  echo "Przykład: ./create_users.sh 5 \"CYB-STA-2\""
+if [ -z "$1" ]; then
+  echo "Użycie: ./create_users.sh <ilosc_uzytkownikow> [campaign_id]"
+  echo "Przykład: ./create_users.sh 10 1"
   exit 1
 fi
 
 LIMIT=$1
-PROGRAM_NAME=$2
+CAMPAIGN_ID=$2
 URL="http://localhost:8000/debug/create-user"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_FILE="$SCRIPT_DIR/users_tokens.log"
 
-
-# Czyszczenie/Inicjalizacja pliku wynikowego
+# Inicjalizacja pliku wynikowego
 : > "$OUTPUT_FILE"
 
 echo "----------------------------------------"
 echo "Rozpoczynam tworzenie $LIMIT studentów..."
-echo "Kierunek: $PROGRAM_NAME"
+if [ -n "$CAMPAIGN_ID" ]; then
+    echo "Przypisanie do kampanii ID: $CAMPAIGN_ID"
+else
+    echo "Brak przypisania do konkretnej kampanii."
+fi
 echo "Zapis do pliku: $OUTPUT_FILE"
 echo "----------------------------------------"
 
 for ((i=1; i<=LIMIT; i++))
 do
-    EMAIL="test${i}@test.uken.krakow.pl"
+    # Generowanie unikalnego maila na podstawie timestampu lub licznika, 
+    # aby uniknąć konfliktów przy wielokrotnym uruchamianiu
+    EMAIL="student${i}@test.uken.krakow.pl"
 
-    echo -n "Tworzenie $EMAIL... "
+    echo -n "[$i/$LIMIT] Tworzenie $EMAIL... "
+
+    # Budowanie JSONa w zależności od tego, czy podano CAMPAIGN_ID
+    if [ -n "$CAMPAIGN_ID" ]; then
+        JSON_DATA="{\"email\": \"$EMAIL\", \"role\": \"student\", \"campaign_id\": $CAMPAIGN_ID}"
+    else
+        JSON_DATA="{\"email\": \"$EMAIL\", \"role\": \"student\"}"
+    fi
 
     RESPONSE=$(curl -s -X POST "$URL" \
         -H "Content-Type: application/json" \
-        -d "{
-        \"email\": \"$EMAIL\",
-        \"role\": \"student\",
-        \"program_name\": \"$PROGRAM_NAME\"
-    }")
+        -d "$JSON_DATA")
 
-    # 1. grep -o: wyciąga cały fragment "access_token": "TOKEN"
-    # 2. sed 1: usuwa wszystko od początku do otwarcia cudzysłowu wartości (czyli usuwa klucz)
-    # 3. sed 2: usuwa ostatni cudzysłów
+    # Wyciąganie tokenu z odpowiedzi JSON
     TOKEN=$(echo "$RESPONSE" | grep -o '"access_token": *"[^"]*"' | sed 's/.*"access_token": *"//' | sed 's/"$//')
 
-    if [ -n "$TOKEN" ]; then
+    if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
         echo "OK"
         echo "$EMAIL" >> "$OUTPUT_FILE"
         echo "$TOKEN" >> "$OUTPUT_FILE"
     else
-        echo "BŁĄD (Brak tokenu)"   
+        echo "BŁĄD (Odpowiedź: $RESPONSE)"   
     fi
 done
 
 echo "----------------------------------------"
-echo "Zakończono. Sprawdź plik $OUTPUT_FILE"
+echo "Zakończono. Dane logowania zapisano w: $OUTPUT_FILE"

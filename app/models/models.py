@@ -3,7 +3,7 @@ from typing import Optional, List
 import enum
 
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
-from sqlalchemy import Column, Enum, Text
+from sqlalchemy import JSON, Column, Enum, Text
 
 # ENUMS (Słowniki) 
 class UserRole(str, enum.Enum):
@@ -21,25 +21,6 @@ class AssignmentMethod(str, enum.Enum):
     LOTTERY = "lottery"       # Losowanie kolejności (Random + Priorities)
     RANDOM = "random"         # Totalna losowość (Ignoruje priorytety, przydziela gdzie popadnie)
 
-# STUDY PROGRAMS (roczniki/kierunki)
-class StudyProgram(SQLModel, table=True):
-    __tablename__ = "study_programs" # type: ignore
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True, index=True) # np. "Inf rok 1"
-    description: Optional[str] = Field(default=None, sa_column=Column(Text))
-    is_active: bool = Field(default=True)
-
-    # Relacje
-    students: List["User"] = Relationship(back_populates="study_program")
-    campaigns: List["RegistrationCampaign"] = Relationship(back_populates="study_program")
-
-    invitations: List["Invitation"] = Relationship(
-        back_populates="study_program",
-        sa_relationship_kwargs={"cascade": "all, delete"}
-    )
-
-
 # USERS (tabela studentow i starostow)
 class User(SQLModel, table=True):
     __tablename__ = "users" # type: ignore
@@ -48,10 +29,10 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True)
     # rola usera (domyślnie student)
     role: UserRole = Field(sa_column=Column(Enum(UserRole), default=UserRole.STUDENT))
-    study_program_id: Optional[int] = Field(default=None, foreign_key="study_programs.id")
+    # lista ID kampanii przechowywana jako JSON
+    allowed_campaign_ids: List[int] = Field(default=[], sa_column=Column(JSON))
 
     # Relacje
-    study_program: Optional[StudyProgram] = Relationship(back_populates="students")
     registrations: List["Registration"] = Relationship(back_populates="student")
     created_campaigns: List["RegistrationCampaign"] = Relationship(back_populates="creator")
 
@@ -62,18 +43,15 @@ class Invitation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(unique=True, index=True) 
     
-    # kogo ten link stworzy? (np. starostę/studenta)
-    target_role: UserRole = Field(sa_column=Column(Enum(UserRole)))
+    target_role: UserRole = Field(sa_column=Column(Enum(UserRole))) # kogo ten link stworzy? (np. starostę/studenta)
+    target_campaign_id: Optional[int] = Field(default=None, foreign_key="registration_campaigns.id") # do jakiej kampani przypisze(opcjonalnie)?
     
-    # do jakiego rocznika przypisze?
-    target_study_program_id: int = Field(foreign_key="study_programs.id")
-    
-    max_uses: int = Field(default=1) # 1 dla linku starosty, np, 200 dla studentów
+    max_uses: int = Field(default=1) # np 1 dla linku starosty, np, 200 dla studentów
     current_uses: int = Field(default=0)
     expires_at: datetime
 
     # Relacje
-    study_program: Optional[StudyProgram] = Relationship(back_populates="invitations")
+    target_campaign: Optional["RegistrationCampaign"] = Relationship(back_populates="invitations")
 
     @property
     def is_valid(self) -> bool:
@@ -103,7 +81,6 @@ class RegistrationCampaign(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     creator_id: Optional[int] = Field(default=None, foreign_key="users.id") #id starosty tworzacego kampanie
-    study_program_id: int = Field(foreign_key="study_programs.id") # id kierunku ktory ma sie tu zapisywac
     title: str # np. CYB-STA-2 - zima 2026
     starts_at: datetime
     ends_at: datetime
@@ -114,7 +91,7 @@ class RegistrationCampaign(SQLModel, table=True):
 
     # Relacje
     creator: Optional[User] = Relationship(back_populates="created_campaigns")
-    study_program: Optional[StudyProgram] = Relationship(back_populates="campaigns")
+    invitations: List["Invitation"] = Relationship(back_populates="target_campaign")
     
     # Cascade delete: jak usuniesz kampanię, usuwają się też grupy
     groups: List["RegistrationGroup"] = Relationship(
@@ -161,9 +138,7 @@ class Registration(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     group_id: int = Field(foreign_key="registration_groups.id")
-    
-    # priorytet wyboru (1 najbardziej, 2 mniej...)
-    priority: int = Field(default=1)
+    priority: int = Field(default=1) # priorytet wyboru (1 najbardziej, 2 mniej...)
     
     # status mowi czy studentowi przydzial udal sie po jego mysli :v
     status: RegistrationStatus = Field(

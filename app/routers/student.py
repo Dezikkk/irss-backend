@@ -13,8 +13,6 @@ from app.models.models import (
 )
 from app.serializers.schemas import (
     CampaignRegistrationRequest,
-    StudentCampaignView, 
-    StudentGroupView, 
 )
 
 router = APIRouter(prefix="/student", tags=["Student"])
@@ -44,9 +42,9 @@ async def submit_preferences(
     if not campaign or campaign.id is None:
         raise HTTPException(status_code=404, detail="Grupa nie jest przypisana do kampanii.")
 
-    # czy jest dla tego studenta i czy aktywna
-    if campaign.study_program_id != current_user.study_program_id:
-        raise HTTPException(status_code=403, detail="Ta kampania nie jest dla Twojego rocznika.")
+    # sprawdzamy czy student ma uprawnienia do tej kampanii w allowed_campaign_ids
+    if campaign.id not in current_user.allowed_campaign_ids:
+        raise HTTPException(status_code=403, detail="Nie masz uprawnień do zapisu w tej kampanii.")
 
     now = datetime.now()
     if not (campaign.starts_at <= now <= campaign.ends_at):
