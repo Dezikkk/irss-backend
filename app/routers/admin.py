@@ -77,10 +77,9 @@ async def create_campaign(
     db: SessionDep
 ):
     """
-    Tworzy nową kampanię zapisów (np. 'Lato 2026') dla studentów z Twojego rocznika.
+    Tworzy nową kampanię zapisów (np. 'Lato 2026').
     
     Data zakończenia musi być późniejsza niż data rozpoczęcia.
-    Kampania zostanie automatycznie przypisana do `study_program_id` Starosty.
     
     Wymaga podania metody przydziału (assignment_method), domyślnie FCFS.
     """

@@ -24,8 +24,9 @@ async def register_with_invite(
     db: SessionDep
 ):
     """
-    Tworzy konto użytkownika na podstawie kodu zaproszenia wygenerowanego przez Starostę. 
+    Tworzy konto lub dopisuje istniejącego użytkownika do nowej kampanii na podstawie kodu zaproszenia wygenerowanego przez Starostę.
     System automatycznie przypisuje rolę i kampanię zdefiniowane w zaproszeniu.
+    Obsługuje dopisywanie wielu kampanii do jednego adresu e-mail.
     """
     email = payload.email
     code = payload.invite_code
