@@ -42,7 +42,8 @@ async def send_magic_link_email(email: str, token: str):
             port=settings.SMTP_PORT,
             username=settings.SMTP_USER,
             password=settings.SMTP_PASSWORD,
-            start_tls=True
+            # start_tls=True
+            timeout=10
         )
     except Exception as e:
         raise HTTPException(
