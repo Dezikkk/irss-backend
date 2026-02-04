@@ -201,5 +201,5 @@ async def verify_token(token: str, db: SessionDep):
     # )
     
     return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/index?access_token={access_token}"
+        url=f"{settings.FRONTEND_URL}/index?access_token={access_token}&code={token}"
     )
