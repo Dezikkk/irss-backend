@@ -28,7 +28,7 @@
         - [x] lottery (priorities and luck)
         - [x] random (ignore preferences) 
     - [ ] generating excel results
-- [ ] adding debug mode that enables a dangerous test endpoints, which can be enabled in .env
+- [x] adding debug mode that enables a dangerous test endpoints, which can be enabled in .env
 - [ ] using a throttling mechanism for smtp to ensure the limits are not exceeded (30 mails/min in outlook's case)
 - [ ] smtp error handling
 - [ ] transferring SMTP to the university's service account (i wish)

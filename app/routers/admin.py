@@ -61,7 +61,7 @@ async def create_student_invite(
     
     # TODO: obecnie link nie bedzie działał bo register-with-invite przyjmuje POST. trzeba tam wkleic endpoint frontendu
     # jak bedzie frontend to dokonczyc zeby poprosic usera o email i dalej wysylac posta na register-with-invite
-    full_link = f"{settings.FRONTEND_URL}/register?code={token}"
+    full_link = f"{settings.FRONTEND_URL}/Logowanie.html#code={token}"
 
     return InvitationLinkResponse(
         invite_link=full_link,

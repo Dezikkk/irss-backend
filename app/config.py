@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     APP_NAME: str
     BACKEND_URL: str
     FRONTEND_URL: str
+    DEBUG_MODE: bool = False
 
 # export settingsow bez tworzenia za kazdym razem obiektu Settings
 @lru_cache

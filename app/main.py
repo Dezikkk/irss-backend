@@ -45,8 +45,13 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(admin.router)
 app.include_router(student.router)
-app.include_router(debug.router) # w production usunac/zakomentowac bo leak secretow 
-# TODO: albo dodac env DEBUG_MODE i sprawdzac czy jest true to wtedy bedzie odpalac
+
+if settings.DEBUG_MODE:
+    app.include_router(debug.router)
+    print(f"\n{'!'*40}")
+    print("UWAGA: TRYB DEBUG WŁĄCZONY")
+    print("Endpointy /debug są dostępne.")
+    print(f"{'!'*40}\n") 
 
 @app.get("/")
 async def root():
