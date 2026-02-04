@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     SMTP_USER: str
     SMTP_PASSWORD: str
     SMTP_FROM: str
+    RESEND_API_KEY: str
+    RESEND_EMAIL_FROM: str
     APP_NAME: str
     BACKEND_URL: str
     FRONTEND_URL: str

@@ -5,6 +5,7 @@ from email.message import EmailMessage
 from typing import Optional
 from jose import jwt
 from fastapi import HTTPException
+import resend
 
 from app.config import get_settings
 
@@ -19,32 +20,25 @@ def generate_magic_token() -> str:
 
 async def send_magic_link_email(email: str, token: str):
     magic_link = f"{settings.BACKEND_URL}/auth/verify?token={token}"
-    
-    message = EmailMessage()
-    message["From"] = settings.SMTP_FROM
-    message["To"] = email
-    message["Subject"] = f"{settings.APP_NAME} - Magic Link"
-    
-    ## TODO: zmien content tej wiadomosci
-    message.set_content(f'''
-    dupa
-        {magic_link}
-        link wygaśnie za {settings.TOKEN_EXPIRE_MINUTES} minut
-        
-    pozdro,
-    {settings.APP_NAME}
-    ''')
+
+    html = f"""
+    <h2>Logowanie do {settings.APP_NAME}</h2>
+    <p>Kliknij w link poniżej, aby się zalogować:</p>
+    <p>
+        <a href="{magic_link}">Zaloguj się</a>
+    </p>
+    <p>Link wygaśnie za {settings.TOKEN_EXPIRE_MINUTES} minut.</p>
+    <br/>
+    <p>Pozdro,<br>{settings.APP_NAME}</p>
+    """
 
     try:
-        await aiosmtplib.send(
-            message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            # start_tls=True
-            timeout=10
-        )
+        resend.Emails.send({
+            "from": settings.RESEND_EMAIL_FROM,
+            "to": email,
+            "subject": f"{settings.APP_NAME} - Magic Link",
+            "html": html
+        })
     except Exception as e:
         raise HTTPException(
             status_code=500,

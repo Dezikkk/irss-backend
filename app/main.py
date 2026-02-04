@@ -29,7 +29,7 @@ origins = [
     "https://localhost:8080",
     "http://127.0.0.1",
     "https://127.0.0.1",
-    # W produkcji tutaj daj domenę np. https://zapisy.uken.pl czy jakie to tam bedzie
+    "https://projektirss.onrender.com"
 ]
 
 app.add_middleware(
