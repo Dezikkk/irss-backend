@@ -197,13 +197,13 @@ async def verify_token(token: str, db: SessionDep):
     three_letters = db.exec(
         select(RegistrationCampaign.title)
         .where(col(RegistrationCampaign.id) == campaign_id)
-    )[:3]
+    ).first()[:3]
 
     # Policz ilość grup w kampanii
     group_amount = db.exec(
-        select(RegistrationGroup, func.count())
-        .where(col(RegistrationGroup.campaign_id) == campaign_id)
-    )
+        select(func.count(RegistrationGroup.id))
+        .where(RegistrationGroup.campaign_id == campaign_id)
+    ).one()
 
     # uniewaznij magic link
     auth_token.is_used = True
