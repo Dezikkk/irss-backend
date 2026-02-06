@@ -96,6 +96,21 @@ class CampaignDetailResponse(BaseModel):
     
     total_registered_students: int # Suma wszystkich zapisanych userow
     groups: List[GroupStatsResponse] # Lista grup ze statystykami
+
+class CampaignSetupRequest(BaseModel):
+    """Pełne utworzenie kampanii, wraz z grupami i zaproszeniem. """
+    campaign: CampaignCreateRequest
+    
+    # troche glupio miec groups.groups w request ale coz
+    groups: BulkGroupCreateRequest
+
+    invitation: CreateStudentInviteRequest
+
+class CampaignSetupResponse(BaseModel):
+    """Response containing all created resources"""
+    campaign: CampaignResponse
+    groups_created: int
+    invitation: InvitationLinkResponse
     
 #endregion
     

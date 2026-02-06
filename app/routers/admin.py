@@ -15,7 +15,7 @@ from app.models.models import (
 from app.serializers.schemas import (
     BulkGroupCreateRequest, BulkGroupResponse, CampaignCreateRequest, CampaignDetailResponse, 
     CampaignResponse, CampaignUpdateRequest, CreateStudentInviteRequest, GroupStatsResponse, 
-    GroupUpdateRequest, InvitationLinkResponse
+    GroupUpdateRequest, InvitationLinkResponse, CampaignSetupResponse, CampaignSetupRequest
     )
 
 settings = get_settings()
@@ -174,6 +174,42 @@ async def add_groups_to_campaign(
         message="Grupy zostały pomyślnie dodane.",
         created_count=len(new_groups)
     )
+
+@router.post("/campaigns/setup", response_model=CampaignSetupResponse)
+async def setup_complete_campaign(
+    data: CampaignSetupRequest,
+    db: SessionDep,
+    current_user: CurrentAdmin
+):
+    """Utworzenie i ustawienie kampanii wraz z grupami i zaproszeniem w jednej transakcji."""
+    
+    try:
+        campaign = await create_campaign(
+            data.campaign, current_user, db
+        )
+        
+        groups = await add_groups_to_campaign(
+            campaign.id, data.groups, current_user, db
+        )
+        
+        invitation = await create_student_invite(
+            data.invitation, current_user, db
+        )
+        
+        db.commit()
+        
+        return CampaignSetupResponse(
+            campaign=campaign,
+            groups_created=len(groups),
+            invitation=invitation
+        )
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Campaign setup failed: {str(e)}"
+        )
     
 @router.get("/campaigns/{campaign_id}", response_model=CampaignDetailResponse)
 async def get_campaign_details(
