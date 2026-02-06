@@ -22,6 +22,8 @@ services:
           condition: service_healthy
     environment:
         POSTGRES_HOST: db
+    env_file:
+      - .env
 
 volumes:
   postgres_data:
