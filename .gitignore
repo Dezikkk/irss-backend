@@ -29,3 +29,6 @@ junit/
 Thumbs.db
 
 *.log
+
+pyproject.toml
+uv.lock
