@@ -223,9 +223,12 @@ async def setup_complete_campaign(
             invitation=invitation_response
         )
         
-    except HTTPException as e:
+    except Exception as e:
         db.rollback()
-        raise e
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(status_code=500, detail=f"Błąd: {str(e)}")
     
 @router.get("/campaigns/{campaign_id}", response_model=CampaignDetailResponse)
 async def get_campaign_details(
