@@ -18,7 +18,10 @@ async def info():
     """
     
     return {
-        "DATABASE_URL": settings.DATABASE_URL,
+        "POSTGRES_DB": settings.POSTGRES_DB,
+        "POSTGRES_USER": settings.POSTGRES_USER,
+        "POSTGRES_PASSWORD": settings.POSTGRES_PASSWORD,
+        "POSTGRES_HOST": settings.POSTGRES_HOST,
         "SECRET_KEY": settings.SECRET_KEY,
         "ALGORITHM": settings.ALGORITHM,
         "TOKEN_EXPIRE_MINUTES": settings.TOKEN_EXPIRE_MINUTES,
