@@ -192,18 +192,26 @@ async def verify_token(token: str, db: SessionDep):
     # Pobierz kampanię do której użytkownik należy
     # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
     campaign_id = user.allowed_campaign_ids[0]
+    if not campaign_id:
+        raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
 
     # Pobierz pierwsze 3 litery tytułu kampanii
-    three_letters = db.exec(
-        select(RegistrationCampaign.title)
-        .where(col(RegistrationCampaign.id) == campaign_id)
-    ).first()[:3]
+    try:
+        three_letters = db.exec(
+            select(RegistrationCampaign.title)
+            .where(col(RegistrationCampaign.id) == campaign_id)
+        ).first()[:3]
+    except:
+        raise HTTPException(status_code=500, detail="Błędna kampania.")
 
     # Policz ilość grup w kampanii
-    group_amount = db.exec(
-        select(func.count(RegistrationGroup.id))
-        .where(RegistrationGroup.campaign_id == campaign_id)
-    ).one()
+    try:
+        group_amount = db.exec(
+            select(func.count(RegistrationGroup.id))
+            .where(RegistrationGroup.campaign_id == campaign_id)
+        ).one()
+    except:
+        raise HTTPException(status_code=500, detail="Błędna kampania, prawdopodobnie bez grup.")
 
     # uniewaznij magic link
     auth_token.is_used = True
