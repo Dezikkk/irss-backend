@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     )
     
     # zdefiniowane wszystkie zmienne srodowiskowe z pliku .env
-    DATABASE_URL: str
+    POSTGRES_DB: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
     SECRET_KEY: str
     ALGORITHM: str
     TOKEN_EXPIRE_MINUTES: int

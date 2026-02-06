@@ -2,6 +2,7 @@ from sqlmodel import create_engine, Session, SQLModel
 from typing import Annotated
 from fastapi import Depends
 from sqlalchemy_utils import database_exists, create_database
+from sqlalchemy import URL
 
 from app.config import get_settings
 # TODO: zweryfikuj czy musi byc import by db wiedzialo co tworzyc
@@ -12,8 +13,17 @@ from app.models.models import (
 
 settings = get_settings()
 
+database_url = URL.create(
+    drivername="postgresql",
+    username=settings.POSTGRES_USER,
+    password=settings.POSTGRES_PASSWORD,
+    host=settings.POSTGRES_HOST,
+    port=5432,
+    database=settings.POSTGRES_DB,
+)
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    database_url,
     echo=settings.DEBUG_MODE,
     pool_pre_ping=True,
 )
