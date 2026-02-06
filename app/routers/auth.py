@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
-from sqlmodel import select
+from sqlmodel import select, col, func
 
 from app.database import SessionDep
 from app.serializers.schemas import (
@@ -12,7 +12,12 @@ from app.core.security import (
     create_access_token, generate_magic_token, 
     send_magic_link_email, validate_uni_email
 )
-from app.models.models import AuthToken, Invitation, RegistrationCampaign, User
+from app.models.models import (
+    AuthToken, Invitation,
+    RegistrationCampaign, RegistrationGroup,
+    User
+)
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -26,6 +31,7 @@ async def register_with_invite(
 ):
     """
     Tworzy konto lub dopisuje istniejącego użytkownika do nowej kampanii na podstawie kodu zaproszenia wygenerowanego przez Starostę.
+    Następnie wysyła maila do logowania.
     System automatycznie przypisuje rolę i kampanię zdefiniowane w zaproszeniu.
     Obsługuje dopisywanie wielu kampanii do jednego adresu e-mail.
     """
@@ -90,13 +96,6 @@ async def register_with_invite(
         db.add(new_user)
         message_detail = "Konto utworzone pomyślnie!"
 
-    # podbij licznik uzycia zaproszenia
-    invite.current_uses += 1
-    db.add(invite)
-    
-    # zapisz wszystko w bazie
-    db.commit() 
-
     # generuj i wyslij magic link
     token = generate_magic_token()
     expires_at = datetime.now() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
@@ -106,7 +105,13 @@ async def register_with_invite(
         token=token,
         expires_at=expires_at
     )
+
     db.add(auth_token)
+
+    # podbij licznik uzycia zaproszenia
+    invite.current_uses += 1
+    db.add(invite)
+
     db.commit()
     
     await send_magic_link_email(email, token)
@@ -183,6 +188,22 @@ async def verify_token(token: str, db: SessionDep):
     user = db.exec(select(User).where(User.email == auth_token.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie istnieje.")
+    
+    # Pobierz kampanię do której użytkownik należy
+    # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
+    campaign_id = user.allowed_campaign_ids[0]
+
+    # Pobierz pierwsze 3 litery tytułu kampanii
+    three_letters = db.exec(
+        select(RegistrationCampaign.title)
+        .where(col(RegistrationCampaign.id) == campaign_id)
+    )[:3]
+
+    # Policz ilość grup w kampanii
+    group_amount = db.exec(
+        select(RegistrationGroup, func.count())
+        .where(col(RegistrationGroup.campaign_id) == campaign_id)
+    )
 
     # uniewaznij magic link
     auth_token.is_used = True
@@ -196,10 +217,8 @@ async def verify_token(token: str, db: SessionDep):
         expires_delta=access_token_expires
     )
     
-    # return TokenResponse(
-    #     access_token=access_token,
-    # )
-    
+    # Zakładając, że frontend ma url w stylu 
+    # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
     return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/index?access_token={access_token}&code={token}"
+        url=f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
     )
