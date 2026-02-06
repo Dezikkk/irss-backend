@@ -101,15 +101,13 @@ class CampaignSetupRequest(BaseModel):
     """Pełne utworzenie kampanii, wraz z grupami i zaproszeniem. """
     campaign: CampaignCreateRequest
     
-    # troche glupio miec groups.groups w request ale coz
-    groups: BulkGroupCreateRequest
-
-    invitation: CreateStudentInviteRequest
+    group_amount: int
+    group_limit: int
 
 class CampaignSetupResponse(BaseModel):
     """Response containing all created resources"""
     campaign: CampaignResponse
-    groups_created: int
+    groups: BulkGroupResponse
     invitation: InvitationLinkResponse
     
 #endregion

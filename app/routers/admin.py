@@ -15,7 +15,8 @@ from app.models.models import (
 from app.serializers.schemas import (
     BulkGroupCreateRequest, BulkGroupResponse, CampaignCreateRequest, CampaignDetailResponse, 
     CampaignResponse, CampaignUpdateRequest, CreateStudentInviteRequest, GroupStatsResponse, 
-    GroupUpdateRequest, InvitationLinkResponse, CampaignSetupResponse, CampaignSetupRequest
+    GroupUpdateRequest, InvitationLinkResponse, CampaignSetupResponse, CampaignSetupRequest,
+    GroupCreateRequest
     )
 
 settings = get_settings()
@@ -184,26 +185,42 @@ async def setup_complete_campaign(
     """Utworzenie i ustawienie kampanii wraz z grupami i zaproszeniem w jednej transakcji."""
     
     try:
-        campaign = await create_campaign(
+        campaign_response = await create_campaign(
             data.campaign, current_user, db
         )
-        
-        groups = await add_groups_to_campaign(
-            campaign.id, data.groups, current_user, db
+
+        group_requests: GroupCreateRequest = []
+
+        for i in range(data.group_amount):
+            request = GroupCreateRequest(
+                name=f"L{i+1}",
+                limit=data.group_limit,
+            )
+            group_requests.append(request)
+
+        add_groups_payload = BulkGroupCreateRequest(
+            groups=group_requests
         )
         
-        data.invitation.campaign_id = campaign.id
+        groups_response = await add_groups_to_campaign(
+            campaign_response.id, add_groups_payload, current_user, db
+        )
+        
+        invitation_payload = CreateStudentInviteRequest(
+            campaign_id=campaign_response.id,
+            max_uses=data.group_amount * data.group_limit,
+        )
 
-        invitation = await create_student_invite(
-            data.invitation, current_user, db
+        invitation_response = await create_student_invite(
+            invitation_payload, current_user, db
         )
         
         db.commit()
         
         return CampaignSetupResponse(
-            campaign=campaign,
-            groups_created=groups.created_count,
-            invitation=invitation
+            campaign=campaign_response,
+            groups=groups_response,
+            invitation=invitation_response
         )
         
     except HTTPException as e:
