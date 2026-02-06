@@ -192,6 +192,8 @@ async def setup_complete_campaign(
             campaign.id, data.groups, current_user, db
         )
         
+        data.invitation.campaign_id = campaign.id
+
         invitation = await create_student_invite(
             data.invitation, current_user, db
         )
@@ -200,16 +202,13 @@ async def setup_complete_campaign(
         
         return CampaignSetupResponse(
             campaign=campaign,
-            groups_created=len(groups),
+            groups_created=groups.created_count,
             invitation=invitation
         )
         
-    except Exception as e:
+    except HTTPException as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Campaign setup failed: {str(e)}"
-        )
+        raise e
     
 @router.get("/campaigns/{campaign_id}", response_model=CampaignDetailResponse)
 async def get_campaign_details(
