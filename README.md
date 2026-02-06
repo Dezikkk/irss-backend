@@ -34,7 +34,8 @@
 - [ ] transferring SMTP to the university's service account (i wish)
 - [ ] add rate limiting and other protection methods if needed
 - [ ] pretty readme
-- [ ] docker and tests maybe later idk
+- [x] docker build
+- [ ] real automatized tests
 
 
 ## Project structure
@@ -48,23 +49,37 @@ The purpose of each folder in the project tree is the following:
 
 
 ## Running locally
-```text
-> Change ".env.example" filename to ".env" and fill in what is needed(DB and SMTP credentials)
-> Now, all you need to do is run script in powershell "run.ps1". 
-It will create a virtual enviorment, download all depedencies and start server :D
 
-Tested on:
-> Python: 3.12.10
-> PostgreSQL: 18.1
+**Prerequisites:** Python interpreter and PostgreSQL server
 
-tip: You can access the auto-generated docs through http://127.0.0.1:8000/docs
-It show full list of endpoints and payloads (genuinely useful)
-```
+1. Copy `.env.example` to `.env` and fill in the required credentials (database and SMTP)
+2. Run the startup script:
+   - **Windows:** `.\run.ps1` in PowerShell
+   - **Linux/macOS:** `./run.sh` in terminal
+
+The script will create a virtual environment, install dependencies, and start the server.
+
+**Tested on:**
+- Python 3.14.2
+- PostgreSQL 18.1
+
+## Running with Docker
+
+**Prerequisites:** Docker and Docker Compose
+
+1. Run `docker-compose up --build` from the repository root
+2. That's it!
+
+**Useful commands:**
+- Stop the application: `docker-compose down`
+- Stop and remove database volume: `docker-compose down -v`
+- Access container shell: `docker-compose exec api bash` or `docker-compose exec db bash`
+- Connect to PostgreSQL: `docker-compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB`
+
 
 ## API Endpoints
 
 Detailed description of every endpoint is avaiable on localhost:8000/docs
-
 
 | method | endpoint | who | what it does |
 | :---: | --- | :---: | --- |
