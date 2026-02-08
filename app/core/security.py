@@ -21,7 +21,7 @@ def generate_magic_token() -> str:
 async def send_magic_link_email(email: str, token: str, registration: bool):
     magic_link = f"{settings.BACKEND_URL}/auth/verify?token={token}"
     if not registration:
-        magic_link += "?registration=false"
+        magic_link += "&registration=false"
 
     html = f"""
     <h2>Logowanie do {settings.APP_NAME}</h2>

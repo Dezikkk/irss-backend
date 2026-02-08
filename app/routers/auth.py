@@ -217,7 +217,7 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
     
         # Zakładając, że frontend ma url w stylu 
         # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
-        redirect = f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
+        redirect = f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G"
     else: # Jeżeli to tylko logowanie, przekieruj do panelu
         redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
 
