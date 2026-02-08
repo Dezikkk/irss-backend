@@ -192,6 +192,7 @@ async def verify_token(token: str, db: SessionDep):
     # Pobierz kampanię do której użytkownik należy
     # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
     campaign_id = user.allowed_campaign_ids[0]
+
     if not campaign_id:
         raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
 
@@ -227,6 +228,18 @@ async def verify_token(token: str, db: SessionDep):
     
     # Zakładając, że frontend ma url w stylu 
     # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
-    return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
+    response = RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G"
     )
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=access_token_expires.total_seconds(),
+        httponly=True,
+        secure= not settings.DEBUG_MODE,
+        samesite="lax",
+        path="/"
+    )
+
+    return response

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from pydantic import BaseModel
 from sqlmodel import select, col, MetaData
 
@@ -63,7 +63,8 @@ class DebugUserRequest(BaseModel):
 @router.post("/create-user")
 async def create_test_user(
     payload: DebugUserRequest,
-    db: SessionDep
+    db: SessionDep,
+    response: Response
 ):
     """
     Tworzy usera z pominięciem emaili.
@@ -107,7 +108,17 @@ async def create_test_user(
          return {"error": "User ID is missing"}
     
     access_token = create_access_token(data={"sub": str(user.id)})
-    
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=60 * 60 * 24,
+        httponly=True,
+        secure= not settings.DEBUG_MODE,
+        samesite="lax",
+        path="/"
+    )
+
     return {
         "message": f"Stworzono/Zaktualizowano usera: {user.email} [{user.role}]",
         "access_token": access_token,
