@@ -215,8 +215,10 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
         except:
             raise HTTPException(status_code=500, detail="Błędna kampania, prawdopodobnie bez grup.")
     
+        # Zakładając, że frontend ma url w stylu 
+        # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
         redirect = f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
-    else:
+    else: # Jeżeli to tylko logowanie, przekieruj do panelu
         redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
 
     # generuj jwt
@@ -230,9 +232,16 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
     auth_token.is_used = True
     db.add(auth_token)
     db.commit()
-    
-    # Zakładając, że frontend ma url w stylu 
-    # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
-    return RedirectResponse(
-        url=redirect
+
+    response = RedirectResponse(url=redirect)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=access_token_expires.total_seconds(),
+        httponly=True,
+        secure= not settings.DEBUG_MODE,
+        samesite="lax",
+        path="/"
     )
+    
+    return response
