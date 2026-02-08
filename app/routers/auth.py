@@ -114,7 +114,7 @@ async def register_with_invite(
 
     db.commit()
     
-    await send_magic_link_email(email, token)
+    await send_magic_link_email(email, token, registration=True)
 
     return MagicLinkResponse(
         message="Sukces!",
@@ -154,7 +154,7 @@ async def request_magic_link(
     db.add(auth_token)
     db.commit()
     
-    await send_magic_link_email(email, token)
+    await send_magic_link_email(email, token, registration=False)
     
     return MagicLinkResponse(
         message="Sprawdź skrzynkę",
@@ -164,7 +164,7 @@ async def request_magic_link(
   
 # weryfikacja (kliknięcie w link z maila) 
 @router.get("/verify", response_model=TokenResponse)
-async def verify_token(token: str, db: SessionDep):
+async def verify_token(token: str, db: SessionDep, registration: bool | None = True):
     """
     Weryfikuje link z maila. 
     Jeśli OK -> Przekierowuje na frontend z tokenem w URL po znaku # (hash).
@@ -173,6 +173,7 @@ async def verify_token(token: str, db: SessionDep):
     Po pomyślnej weryfikacji token zostaje oznaczony jako zużyty (`is_used = True`).
     Zwrócony token JWT należy przesyłać w nagłówku `Authorization: Bearer <token>` 
     przy każdym kolejnym zapytaniu.
+    Jeżeli registration == False -> przekierowuje do panelu użytkownika
     """
     
     # sprawdz authtoken w db
@@ -189,34 +190,34 @@ async def verify_token(token: str, db: SessionDep):
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie istnieje.")
     
-    # Pobierz kampanię do której użytkownik należy
-    # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
-    campaign_id = user.allowed_campaign_ids[0]
-    if not campaign_id:
-        raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
+    if registration:
+        # Pobierz kampanię do której użytkownik należy
+        # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
+        campaign_id = user.allowed_campaign_ids[0]
+        if not campaign_id:
+            raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
 
-    # Pobierz pierwsze 3 litery tytułu kampanii
-    try:
-        three_letters = db.exec(
-            select(RegistrationCampaign.title)
-            .where(col(RegistrationCampaign.id) == campaign_id)
-        ).first()[:3].upper()
-    except:
-        raise HTTPException(status_code=500, detail="Błędna kampania.")
+        # Pobierz pierwsze 3 litery tytułu kampanii
+        try:
+            three_letters = db.exec(
+                select(RegistrationCampaign.title)
+                .where(col(RegistrationCampaign.id) == campaign_id)
+            ).first()[:3].upper()
+        except:
+            raise HTTPException(status_code=500, detail="Błędna kampania.")
 
-    # Policz ilość grup w kampanii
-    try:
-        group_amount = db.exec(
-            select(func.count(RegistrationGroup.id))
-            .where(RegistrationGroup.campaign_id == campaign_id)
-        ).one()
-    except:
-        raise HTTPException(status_code=500, detail="Błędna kampania, prawdopodobnie bez grup.")
-
-    # uniewaznij magic link
-    auth_token.is_used = True
-    db.add(auth_token)
-    db.commit()
+        # Policz ilość grup w kampanii
+        try:
+            group_amount = db.exec(
+                select(func.count(RegistrationGroup.id))
+                .where(RegistrationGroup.campaign_id == campaign_id)
+            ).one()
+        except:
+            raise HTTPException(status_code=500, detail="Błędna kampania, prawdopodobnie bez grup.")
+    
+        redirect = f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
+    else:
+        redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
 
     # generuj jwt
     access_token_expires = timedelta(hours=settings.SESSION_EXPIRE_HOURS)
@@ -224,9 +225,14 @@ async def verify_token(token: str, db: SessionDep):
         data={"sub": str(user.id)},  # id usera zakodowane
         expires_delta=access_token_expires
     )
+
+    # uniewaznij magic link
+    auth_token.is_used = True
+    db.add(auth_token)
+    db.commit()
     
     # Zakładając, że frontend ma url w stylu 
     # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
     return RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G-{access_token}"
+        url=redirect
     )
