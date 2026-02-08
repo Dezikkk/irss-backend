@@ -14,5 +14,5 @@ else
 	echo "File requirements.txt not found."
 fi
 
-# Run the thingy
-.venv/bin/uvicorn app.main:app --reload
+# Run the thing
+.venv/bin/python -m app.main

@@ -98,6 +98,11 @@ async def create_campaign(
             status_code=400,
             detail="Tytuł nie może zawierać spacji."
         )
+    if len(payload.title) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Tytuł jest za krótki."
+        )
 
     # tworzenie obiektu bazy danych
     new_campaign = RegistrationCampaign(
