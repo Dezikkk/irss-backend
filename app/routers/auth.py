@@ -200,7 +200,7 @@ async def verify_token(token: str, db: SessionDep):
         three_letters = db.exec(
             select(RegistrationCampaign.title)
             .where(col(RegistrationCampaign.id) == campaign_id)
-        ).first()[:3]
+        ).first()[:3].upper()
     except:
         raise HTTPException(status_code=500, detail="Błędna kampania.")
 

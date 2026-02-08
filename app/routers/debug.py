@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlmodel import select, col
+from sqlmodel import select, col, MetaData
 
 from app.config import get_settings
 from app.database import SessionDep
@@ -10,8 +10,8 @@ from app.core.security import create_access_token
 settings = get_settings()
 router = APIRouter(prefix="/debug", tags=["Debug"])
 
-@router.get("/info")
-async def info():
+@router.get("/env")
+async def environment_variables_dump():
     """
     dump wszystkich zmiennych srodowiskowych
     tak wiem mega bezpieczne :3
@@ -39,7 +39,21 @@ async def info():
         "FRONTEND_URL": settings.FRONTEND_URL,
         "DEBUG_MODE": settings.DEBUG_MODE
     }
-    
+
+@router.get("/database")
+async def database_dump(
+    db: SessionDep
+):
+    """
+    Dump całej bazy danych.
+    """
+
+    meta = MetaData()
+    meta.reflect(bind=db.get_bind())
+    result = {}
+    for table in meta.sorted_tables:
+        result[table.name] = [dict(row._mapping) for row in db.exec(table.select())]
+    return result
     
 class DebugUserRequest(BaseModel):
     email: str

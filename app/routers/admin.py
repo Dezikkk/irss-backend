@@ -92,6 +92,13 @@ async def create_campaign(
             detail="Data zakończenia musi być późniejsza niż data rozpoczęcia."
         )
 
+    # Walidacja tytułu
+    if ' ' in payload.title:
+        raise HTTPException(
+            status_code=400,
+            detail="Tytuł nie może zawierać spacji."
+        )
+
     # tworzenie obiektu bazy danych
     new_campaign = RegistrationCampaign(
         title=payload.title,
