@@ -24,11 +24,12 @@ async def get_current_user(
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Nieprawidłowe dane uwierzytelniające (Token nieważny)",
+        detail="Nieprawidłowe dane uwierzytelniające.",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
     if not access_token:
+        credentials_exception.detail += "(Brak tokenu)"
         raise credentials_exception
 
     try:
@@ -41,15 +42,18 @@ async def get_current_user(
         user_id: str | None = payload.get("sub")
         
         if user_id is None:
+            credentials_exception.detail += "(Puste dane)"
             raise credentials_exception
             
     except JWTError:
+        credentials_exception.detail += "(Nieprawidłowy token)"
         raise credentials_exception
 
     # get user z bazy
     user = db.get(User, int(user_id))
     
     if user is None:
+        credentials_exception.detail += "(Nie ma takiego użytkownika)"
         raise credentials_exception
         
     return user
