@@ -115,7 +115,7 @@ async def create_test_user(
         max_age=60 * 60 * 24,
         httponly=True,
         secure= not settings.DEBUG_MODE,
-        samesite="lax",
+        samesite="none",
         path="/"
     )
 
