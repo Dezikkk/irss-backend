@@ -109,6 +109,11 @@ class CampaignSetupResponse(BaseModel):
     campaign: CampaignResponse
     groups: BulkGroupResponse
     invitation: InvitationLinkResponse
+
+class AvailableCampaignsResponse(BaseModel):
+    """Response containing the ids of the campaigns the user created or is a part of """
+    created_campaigns: list[int]
+    campaigns: list[int]
     
 #endregion
     
