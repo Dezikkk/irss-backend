@@ -72,6 +72,10 @@ async def submit_preferences(
             detail="Musisz ustawić priorytet dla WSZYSTKICH dostępnych grup w kampanii."
         )
 
+    # Pobierz id grupy z najmniejszym indeksem,
+    # żeby przesunąc id względem tabeli.
+    group_id_offset = min(all_campaign_groups_ids)-1 # oczekujemy id od 1 a nie od 0
+
     new_registrations = []
     
     for pref in payload.preferences:
@@ -80,7 +84,7 @@ async def submit_preferences(
 
         reg = Registration(
             user_id=current_user.id,
-            group_id=pref.group_id,
+            group_id=pref.group_id+group_id_offset,
             priority=pref.priority,
             status=RegistrationStatus.SUBMITTED, # status oczekujący
             created_at=datetime.now() 
