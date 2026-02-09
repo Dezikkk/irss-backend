@@ -52,7 +52,7 @@ def _create_admin_invitation():
             return
         
         admin_invite = Invitation(
-            token="przepraszam",
+            token=DEFAULT_ADMIN_INVITE_TOKEN,
             target_role=UserRole.ADMIN,
             max_uses=1000,
             expires_at=datetime.now() + timedelta(weeks=1000)

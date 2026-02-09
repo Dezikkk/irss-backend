@@ -18,10 +18,10 @@ def validate_uni_email(email: str) -> bool:
 def generate_magic_token() -> str:
     return secrets.token_urlsafe(32)
 
-async def send_magic_link_email(email: str, token: str, registration: bool):
+async def send_magic_link_email(email: str, token: str, invite: str = None):
     magic_link = f"{settings.BACKEND_URL}/auth/verify?token={token}"
-    if not registration:
-        magic_link += "&registration=false"
+    if invite:
+        magic_link += f"&invite={invite}"
 
     html = f"""
     <h2>Logowanie do {settings.APP_NAME}</h2>

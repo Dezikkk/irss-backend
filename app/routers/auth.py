@@ -118,7 +118,7 @@ async def register_with_invite(
     db.commit()
     
     # Jeżeli utworzono nowego starostę, magic link przekierowuje do panelu starosty 
-    await send_magic_link_email(email, token, registration= not new_admin)
+    await send_magic_link_email(email, token, invite=code if not new_admin else None)
 
     return MagicLinkResponse(
         message="Sukces!",
@@ -158,7 +158,7 @@ async def request_magic_link(
     db.add(auth_token)
     db.commit()
     
-    await send_magic_link_email(email, token, registration=False)
+    await send_magic_link_email(email, token)
     
     return MagicLinkResponse(
         message="Sprawdź skrzynkę",
@@ -168,7 +168,7 @@ async def request_magic_link(
   
 # weryfikacja (kliknięcie w link z maila) 
 @router.get("/verify", response_model=TokenResponse)
-async def verify_token(token: str, db: SessionDep, registration: bool | None = True):
+async def verify_token(token: str, db: SessionDep, invite: str | None = None):
     """
     Weryfikuje link z maila. 
     Jeśli OK -> Przekierowuje na frontend z tokenem w URL po znaku # (hash).
@@ -194,12 +194,11 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie istnieje.")
     
-    if registration:
-        # Pobierz kampanię do której użytkownik należy
-        # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych...
-        # Mam wrażenie, że powinniśmy pobrać jako parametr też id kampanii,
-        # tylko że wtedy send_magic_link_email też potrzebowałoby i nie wiem czy warto
-        campaign_id = user.allowed_campaign_ids[0] # Dla starosty to nie zadziała
+    if invite:
+        campaign_invite = db.exec(
+            select(Invitation)
+            .where(col(Invitation.token) == invite)).first()
+        campaign_id = campaign_invite.target_campaign_id
         if not campaign_id:
             raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
 
