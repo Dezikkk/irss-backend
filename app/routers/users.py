@@ -65,7 +65,6 @@ async def get_available_campaigns(
     Zwraca kampanie (wraz z grupami) i statusem na podstawie allowed_campaign_ids przypisanych do studenta.
     Pokazuje też kampanie które sie zakonczyly i nie rozpoczeły oraz status tekstowy.
     """
-    now = datetime.now()
     
     if not current_user.allowed_campaign_ids:
         return AvailableCampaignsResponse(
@@ -84,7 +83,10 @@ async def get_available_campaigns(
     campaigns = db.exec(statement).all()
 
     if not campaigns:
-        return []
+        return AvailableCampaignsResponse(
+            created_campaigns=[],
+            campaigns=[]
+        )
     
     created_campaigns = []
     campaigns_in = []
