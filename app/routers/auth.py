@@ -36,7 +36,7 @@ async def register_with_invite(
     Obsługuje dopisywanie wielu kampanii do jednego adresu e-mail.
     """
     email = payload.email
-    code = payload.invite_code
+    code = payload.invite
 
     # waliduj domene uni
     if not validate_uni_email(email):

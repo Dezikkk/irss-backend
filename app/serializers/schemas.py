@@ -18,7 +18,7 @@ class MagicLinkResponse(BaseModel):
 class RegisterWithInviteRequest(BaseModel):
     """Dane potrzebne do założenia konta przez studenta za pomocą kodu od Starosty"""
     email: EmailStr
-    invite_code: str
+    invite: str
  
 class TokenResponse(BaseModel):
     """Zwracany po pomyślnej weryfikacji Magic Linku; zawiera JWT"""
