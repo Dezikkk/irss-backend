@@ -15,7 +15,7 @@ from app.core.security import (
 from app.models.models import (
     AuthToken, Invitation,
     RegistrationCampaign, RegistrationGroup,
-    User
+    User, UserRole
 )
 
 from app.config import get_settings
@@ -61,6 +61,7 @@ async def register_with_invite(
 
     # sprawdź czy user już istnieje
     user = db.exec(select(User).where(User.email == email)).first()
+    new_admin = False # Rozpatrowywanie przypadku tworzenia nowego starosty
 
     if user:
     # --- SCENARIUSZ A: UPDATE ISTNIEJĄCEGO USERA ---
@@ -95,6 +96,8 @@ async def register_with_invite(
         )
         db.add(new_user)
         message_detail = "Konto utworzone pomyślnie!"
+        if invite.target_role == UserRole.ADMIN:
+            new_admin = True
 
     # generuj i wyslij magic link
     token = generate_magic_token()
@@ -114,7 +117,8 @@ async def register_with_invite(
 
     db.commit()
     
-    await send_magic_link_email(email, token, registration=True)
+    # Jeżeli utworzono nowego starostę, magic link przekierowuje do panelu starosty 
+    await send_magic_link_email(email, token, registration= not new_admin)
 
     return MagicLinkResponse(
         message="Sukces!",
@@ -192,8 +196,10 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
     
     if registration:
         # Pobierz kampanię do której użytkownik należy
-        # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych
-        campaign_id = user.allowed_campaign_ids[0]
+        # TODO: Co się stanie jak użytkownik będzie miał wiele kapamanii przypisanych...
+        # Mam wrażenie, że powinniśmy pobrać jako parametr też id kampanii,
+        # tylko że wtedy send_magic_link_email też potrzebowałoby i nie wiem czy warto
+        campaign_id = user.allowed_campaign_ids[0] # Dla starosty to nie zadziała
         if not campaign_id:
             raise HTTPException(status_code=404, detail="Użytkownik nie ma przypisanej kampanii.")
 
@@ -219,7 +225,8 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
         # URL/index?group_id={pierwsze 3 litery zapisów}-{ilosc grup}G-{unikatowy token}
         redirect = f"{settings.FRONTEND_URL}/index?group_id={three_letters}-{group_amount}G"
     else: # Jeżeli to tylko logowanie, przekieruj do panelu
-        redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
+        if user.role == UserRole.ADMIN:
+            redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
 
     # generuj jwt
     access_token_expires = timedelta(hours=settings.SESSION_EXPIRE_HOURS)
