@@ -114,7 +114,7 @@ async def create_test_user(
         value=access_token,
         max_age=60 * 60 * 24,
         httponly=True,
-        secure= not settings.DEBUG_MODE,
+        secure= True,
         samesite="none",
         path="/"
     )
