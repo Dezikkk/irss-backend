@@ -239,8 +239,9 @@ async def verify_token(token: str, db: SessionDep, registration: bool | None = T
         value=access_token,
         max_age=access_token_expires.total_seconds(),
         httponly=True,
-        secure= not settings.DEBUG_MODE,
-        samesite="lax",
+        #secure= not settings.DEBUG_MODE,
+        secure= True,
+        samesite="none",
         path="/"
     )
     
