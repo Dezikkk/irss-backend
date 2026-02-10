@@ -20,7 +20,8 @@ app = FastAPI(
     description="irss projekt do rekru",
     version="1.0.0",
     lifespan=lifespan,
-    root_path="/api"
+    # We'll uncomment this on production
+    #root_path="/api"
     )
 
 origins = [
