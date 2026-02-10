@@ -70,7 +70,7 @@ async def submit_preferences(
         .join(RegistrationGroup, col(Registration.group_id) == col(RegistrationGroup.id))
         .where(col(Registration.user_id) == current_user.id)
         .where(col(RegistrationGroup.campaign_id) == campaign.id)
-    ).first()
+    ).all()
 
     #if existing_reg:
         #raise HTTPException(status_code=400, detail="Już złożyłeś wniosek w tej kampanii. Edycja jest zablokowana.")
@@ -92,6 +92,10 @@ async def submit_preferences(
 
     # zapisz wszystko w akcji z db
     try:
+        # Usuwanie starych zapisów jeżeli zostały nadpisane
+        for old_registration in existing_reg:
+            db.delete(old_registration)
+                
         db.add_all(new_registrations)
         db.commit()
     except Exception as e:
