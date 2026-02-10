@@ -168,12 +168,15 @@ async def request_magic_link(
     )
     
   
-@router.get("/verify")
+@router.get("/verify", response_model=TokenResponse)
 async def verify_token(token: str, db: SessionDep, invite: str | None = None):
     """
     Weryfikuje link logowania.
     Generuje link zgodny z wymaganiami frontendu:
     /?group_id={3_LITERY}-{ILOSC_GRUP}G&invite={KOD}
+    
+    Jeśli nie uda się ustalić kampanii (np. błędny invite),
+    zwraca link bez group_id: /?invite={KOD}
     """
     
     # 1. Walidacja tokenu AuthToken
@@ -188,41 +191,53 @@ async def verify_token(token: str, db: SessionDep, invite: str | None = None):
         raise HTTPException(status_code=404, detail="Użytkownik nie istnieje.")
     
     # 3. Budowanie URL przekierowania
-    redirect = f"{settings.FRONTEND_URL}/" # Domyślny fallback
+    # Domyślny fallback (gdyby nic innego nie zadziałało)
+    redirect = f"{settings.FRONTEND_URL}/"
 
     if invite:
         # Próba zbudowania "bogatego" linku dla frontendu
+        # Używamy try-except, żeby błąd w pobieraniu detali kampanii nie zablokował logowania
         try:
-            # Pobierz zaproszenie
+            # Pobierz samo zaproszenie (nie sprawdzamy czy user jest przypisany!)
             campaign_invite = db.exec(
                 select(Invitation).where(Invitation.token == invite)
             ).first()
 
+            # Flaga sukcesu budowania pełnego linku
+            full_link_created = False
+
             if campaign_invite and campaign_invite.target_campaign_id:
                 campaign_id = campaign_invite.target_campaign_id
-
-                # Pobierz tytuł (3 litery)
+                
+                # Pobierz kampanię
                 campaign = db.get(RegistrationCampaign, campaign_id)
+                
                 if campaign:
                     three_letters = campaign.title[:3].upper()
                     
-                    # Policz grupy
-                    group_amount = db.exec(
+                    # Policz grupy (używamy scalar dla bezpieczeństwa typu)
+                    group_amount = db.scalar(
                         select(func.count(RegistrationGroup.id))
                         .where(RegistrationGroup.campaign_id == campaign_id)
-                    ).one()
+                    )
+                    
+                    # Zabezpieczenie na wypadek None (0 grup)
+                    if group_amount is None:
+                        group_amount = 0
 
-                    # --- TUTAJ JEST FORMAT KTÓREGO WYMAGA FRONTEND ---
+                    # SUKCES: Mamy wszystkie dane, budujemy pełny link
                     redirect = f"{settings.FRONTEND_URL}/?group_id={three_letters}-{group_amount}G&invite={invite}"
-                else:
-                    # Kampania nie istnieje? Fallback
-                    redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
-            else:
+                    full_link_created = True
+            
+            # Jeśli nie udało się zbudować pełnego linku (np. brak kampanii pod tym invite),
+            # ustawiamy wersję podstawową z samym invite
+            if not full_link_created:
                 redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
 
         except Exception as e:
-            # W razie błędu bazy, nie blokuj logowania, ale daj prosty link
-            print(f"Błąd generowania linku redirect: {e}")
+            # W razie błędu bazy (np. problem z liczeniem grup), logujemy błąd,
+            # ale puszczamy użytkownika dalej z prostym linkiem.
+            print(f"Non-critical error generating redirect link: {e}")
             redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
 
     else:
@@ -251,7 +266,7 @@ async def verify_token(token: str, db: SessionDep, invite: str | None = None):
         value=access_token,
         max_age=access_token_expires.total_seconds(),
         httponly=True,
-        secure=True, # Wymagane dla samesite="none" (na produkcji/renderze)
+        secure=True, 
         samesite="none",
         path="/"
     )

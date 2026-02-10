@@ -478,7 +478,8 @@ async def resolve_campaign(
         # zapis stanu do db
         campaign.last_resolved_method = campaign.assignment_method
         
-        # campaign.is_active = False 
+        campaign.is_active = False
+        campaign.ends_at = datetime.now()
         
         db.add(campaign)
         db.commit()
