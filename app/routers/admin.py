@@ -290,13 +290,8 @@ async def get_campaign_details(
     statement = (
         select(
             RegistrationGroup,
-            # licznik 1: ile osob ma status ASSIGNED(przydzielono)
-            # bedzie działać po zadzialaniu algorytmu przydzielajacego
-            func.count(
-                case(
-                    (col(Registration.status) == RegistrationStatus.ASSIGNED, 1)
-                )
-            ),
+            # licznik 1: Ilość zapisóœ do grupy
+            func.count(),
             # licznik 2: popularność
             # ile osob dala ta grupe na pierwszy priorytet
             func.count(
