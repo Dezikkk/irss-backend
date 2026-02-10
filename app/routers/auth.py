@@ -55,9 +55,11 @@ async def register_with_invite(
 
     # walidacja kampanii (jeśli kod dotyczy kampanii)
     if invite.target_campaign_id is not None:
-        campaign_exists = db.get(RegistrationCampaign, invite.target_campaign_id)
-        if not campaign_exists:
+        campaign = db.get(RegistrationCampaign, invite.target_campaign_id)
+        if not campaign:
             raise HTTPException(status_code=404, detail="Kampania z zaproszenia już nie istnieje.")
+        if not campaign.is_active:
+            raise HTTPException(status_code=400, detail="Kampania jeszcze się nie zaczęła albo już się skończyła.")
 
     # sprawdź czy user już istnieje
     user = db.exec(select(User).where(User.email == email)).first()
