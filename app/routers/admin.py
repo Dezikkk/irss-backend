@@ -33,13 +33,11 @@ async def create_student_invite(
     db: SessionDep
 ):
     """
-    Generuje link zaproszeniowy dla studentów z tego samego rocznika.
+    Generuje link zaproszeniowy dla studentów z parametrem group_id.
     Tylko dla STAROSTY.
-    
-    link, który po przesłaniu studentom pozwala im na założenie konta bez ręcznej weryfikacji przez administratora systemu.
     """
     
-    # sprawdź czy kampania istnieje i należy do tego starosty
+    # 1. Sprawdź czy kampania istnieje
     campaign = db.get(RegistrationCampaign, payload.campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
@@ -47,14 +45,30 @@ async def create_student_invite(
     if campaign.creator_id != current_user.id:
         raise HTTPException(status_code=403, detail="Nie możesz zapraszać do kampanii, której nie stworzyłeś.")
     
-    # generuj token
+    # 2. Oblicz dane potrzebne do group_id (3 litery + ilość grup)
+    three_letters = campaign.title[:3].upper()
+    
+    # Liczymy grupy w tej kampanii
+    group_count = db.scalar(
+        select(func.count(RegistrationGroup.id))
+        .where(RegistrationGroup.campaign_id == payload.campaign_id)
+    )
+    
+    # Zabezpieczenie (gdyby nie było grup, dajemy 0)
+    if group_count is None:
+        group_count = 0
+        
+    # Format np.: INF-5G
+    group_id_param = f"{three_letters}-{group_count}G"
+
+    # 3. Generuj token
     token = secrets.token_urlsafe(16)
     expires_at = datetime.now() + timedelta(days=payload.days_valid)
 
-    # stwórz zaproszenie w bazie
+    # 4. Stwórz zaproszenie w bazie
     invite = Invitation(
         token=token,
-        target_role=UserRole.STUDENT,       # tworzymy studenta
+        target_role=UserRole.STUDENT,
         target_campaign_id=payload.campaign_id,
         max_uses=payload.max_uses,
         expires_at=expires_at
@@ -63,7 +77,9 @@ async def create_student_invite(
     db.add(invite)
     db.commit()
     
-    full_link = f"{settings.FRONTEND_URL}/pages/Logowanie.html?invite={token}"
+    # 5. Zbuduj pełny link z parametrami
+    # Format: .../Logowanie.html?group_id=INF-5G&invite=abc123token
+    full_link = f"{settings.FRONTEND_URL}/pages/Logowanie.html?group_id={group_id_param}&invite={token}"
 
     return InvitationLinkResponse(
         invite_link=full_link,
