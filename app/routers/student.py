@@ -72,8 +72,8 @@ async def submit_preferences(
         .where(col(RegistrationGroup.campaign_id) == campaign.id)
     ).first()
 
-    if existing_reg:
-        raise HTTPException(status_code=400, detail="Już złożyłeś wniosek w tej kampanii. Edycja jest zablokowana.")
+    #if existing_reg:
+        #raise HTTPException(status_code=400, detail="Już złożyłeś wniosek w tej kampanii. Edycja jest zablokowana.")
 
     new_registrations = []
     
@@ -99,7 +99,7 @@ async def submit_preferences(
         raise HTTPException(status_code=500, detail=f"Błąd zapisu bazy danych: {str(e)}")
 
     return {
-        "message": "Wniosek przyjęty.", 
+        "message": "Wniosek przyjęty." if not existing_reg else "Wniosek nadpisany.", 
         "campaign": campaign.title,
         "submitted_count": len(new_registrations)
     }
