@@ -18,7 +18,7 @@ class MagicLinkResponse(BaseModel):
 class RegisterWithInviteRequest(BaseModel):
     """Dane potrzebne do założenia konta przez studenta za pomocą kodu od Starosty"""
     email: EmailStr
-    invite_code: str
+    invite: str
  
 class TokenResponse(BaseModel):
     """Zwracany po pomyślnej weryfikacji Magic Linku; zawiera JWT"""
@@ -109,6 +109,11 @@ class CampaignSetupResponse(BaseModel):
     campaign: CampaignResponse
     groups: BulkGroupResponse
     invitation: InvitationLinkResponse
+
+class AvailableCampaignsResponse(BaseModel):
+    """Response containing the ids of the campaigns the user created or is a part of """
+    created_campaigns: list[int]
+    campaigns: list[int]
     
 #endregion
     
@@ -138,6 +143,7 @@ class GroupPreference(BaseModel):
 class CampaignRegistrationRequest(BaseModel):
     """Pełny wniosek studenta o zapis do kampanii (musi zawierać wszystkie grupy)"""
     preferences: List[GroupPreference]
+    invite: str
 
     @field_validator('preferences') 
     @classmethod 

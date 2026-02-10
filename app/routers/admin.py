@@ -60,9 +60,7 @@ async def create_student_invite(
     db.add(invite)
     db.commit()
     
-    # TODO: obecnie link nie bedzie działał bo register-with-invite przyjmuje POST. trzeba tam wkleic endpoint frontendu
-    # jak bedzie frontend to dokonczyc zeby poprosic usera o email i dalej wysylac posta na register-with-invite
-    full_link = f"{settings.FRONTEND_URL}/pages/Logowanie.html?code={token}"
+    full_link = f"{settings.FRONTEND_URL}/pages/Logowanie.html?invite={token}"
 
     return InvitationLinkResponse(
         invite_link=full_link,
@@ -97,6 +95,12 @@ async def create_campaign(
         raise HTTPException(
             status_code=400,
             detail="Tytuł nie może zawierać spacji."
+        )
+    
+    if len(payload.title) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Tytuł jest za krótki."
         )
 
     # tworzenie obiektu bazy danych

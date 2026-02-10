@@ -15,6 +15,7 @@ from app.models.models import (
 )
 from app.serializers.schemas import (
     StudentCampaignView, 
+    AvailableCampaignsResponse,
     StudentGroupView, 
 )
 
@@ -55,9 +56,7 @@ async def get_dashboard(current_user: CurrentUser, db: SessionDep):
         }
 
 
-# TODO: Zawiera N+1 problem, naprawic w przyszłości
-# przy duzej ilosci kampanii moze powodowac opoznienia bo duzo razy querry do db
-@router.get("/available-campaigns", response_model=List[StudentCampaignView])
+@router.get("/available-campaigns", response_model=AvailableCampaignsResponse)
 async def get_available_campaigns(
     current_user: CurrentUser,
     db: SessionDep
@@ -66,10 +65,12 @@ async def get_available_campaigns(
     Zwraca kampanie (wraz z grupami) i statusem na podstawie allowed_campaign_ids przypisanych do studenta.
     Pokazuje też kampanie które sie zakonczyly i nie rozpoczeły oraz status tekstowy.
     """
-    now = datetime.now()
     
     if not current_user.allowed_campaign_ids:
-        return []
+        return AvailableCampaignsResponse(
+            created_campaigns=[],
+            campaigns=[]
+        )
 
     # 1. Pobieranie kampanii
     statement = (
@@ -82,65 +83,23 @@ async def get_available_campaigns(
     campaigns = db.exec(statement).all()
 
     if not campaigns:
-        return []
-
-    # 2. Zbieramy ID wszystkich grup
-    all_group_ids = [
-        group.id 
-        for campaign in campaigns 
-        for group in campaign.groups 
-        if group.id is not None
-    ]
-
-    # 3. Batch Query: Liczymy "jedynki"
-    counts_statement = (
-        select(Registration.group_id, func.count(col(Registration.id)))
-        .where(col(Registration.group_id).in_(all_group_ids))
-        .where(Registration.priority == 1)
-        .where(Registration.status != RegistrationStatus.REJECTED)
-        .group_by(col(Registration.group_id))  # Tutaj col() naprawia błąd w group_by
-    )
+        return AvailableCampaignsResponse(
+            created_campaigns=[],
+            campaigns=[]
+        )
     
-    counts_result = db.exec(counts_statement).all()
-    
-    # NAPRAWA: Dict jest teraz zaimportowany
-    priority_map: Dict[int, int] = {row[0]: row[1] for row in counts_result}
-
-    # 4. Budowanie odpowiedzi
-    response = []
+    created_campaigns = []
+    campaigns_in = []
 
     for campaign in campaigns:
         if campaign.id is None:
             continue
+
+        if campaign.creator_id == current_user.id:
+            created_campaigns.append(campaign.id)
+        campaigns_in.append(campaign.id)
         
-        if now < campaign.starts_at:
-            status_msg = "Wkrótce"
-        elif now > campaign.ends_at:
-            status_msg = "Zakończone"
-        else:
-            status_msg = "Aktywne"
-
-        groups_view = []
-        for group in campaign.groups:
-            if group.id is None:
-                continue
-
-            count = priority_map.get(group.id, 0)
-
-            groups_view.append(StudentGroupView(
-                id=group.id,
-                name=group.name,
-                limit=group.limit,
-                first_priority_count=count 
-            ))
-
-        response.append(StudentCampaignView(
-            id=campaign.id, 
-            title=campaign.title,
-            starts_at=campaign.starts_at,
-            ends_at=campaign.ends_at,
-            status=status_msg,
-            groups=groups_view
-        ))
-        
-    return response
+    return AvailableCampaignsResponse(
+        created_campaigns=created_campaigns,
+        campaigns=campaigns_in
+    )
