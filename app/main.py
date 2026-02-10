@@ -19,7 +19,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="irss projekt do rekru",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    root_path="/api"
     )
 
 origins = [
