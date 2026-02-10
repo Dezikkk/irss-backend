@@ -1,8 +1,11 @@
 import secrets
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func, and_ 
 from sqlmodel import select, col
+import pandas as pd
+from io import BytesIO
 
 from app.config import get_settings
 from app.core.assignment import resolve_campaign_logic
@@ -10,7 +13,7 @@ from app.database import SessionDep
 from app.core.dependencies import CurrentAdmin
 from app.models.models import (
     Invitation, Registration, RegistrationCampaign, RegistrationGroup, 
-    RegistrationStatus, UserRole
+    RegistrationStatus, User, UserRole
     )
 from app.serializers.schemas import (
     BulkGroupCreateRequest, BulkGroupResponse, CampaignCreateRequest, CampaignDetailResponse, 
@@ -500,7 +503,74 @@ async def download_campaign_results(
     db: SessionDep
 ):
     """
-    Pobranie tabelki w excelu z przydziałem do grup w danej kampanii.
-    UNINPLEMNETED YET
+    Generuje plik Excel z wynikami przydziału i wysyła go jako strumień (bez zapisu na dysku).
     """
-    pass
+    
+    # pobranie i walidacja kampanii
+    campaign = db.get(RegistrationCampaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Kampania nie istnieje.")
+    
+    if campaign.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Brak uprawnień do pobrania wyników tej kampanii.")
+
+    # pobieramy dane studentów i ich przydziałów
+    statement = (
+        select(
+            User.email,
+            RegistrationGroup.name.label("group_name"),
+            Registration.priority,
+            Registration.status,
+            Registration.created_at
+        )
+        .join(Registration, Registration.user_id == User.id)
+        .join(RegistrationGroup, Registration.group_id == RegistrationGroup.id)
+        .where(RegistrationGroup.campaign_id == campaign_id)
+        # Jeśli chcesz pełną listę zgłoszeń, usuń poniższą linię:
+        .where(Registration.status == RegistrationStatus.ASSIGNED) 
+        .order_by(RegistrationGroup.name, User.email)
+    )
+    
+    results = db.exec(statement).all()
+    
+    # wyniki sql --> lista słowników
+    data = []
+    for row in results:
+        data.append({
+            "Email studenta": row.email,
+            "Grupa": row.group_name,
+            "Priorytet": row.priority,
+            "Status": row.status,
+            "Data zgłoszenia": row.created_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    # Obsługa przypadku, gdy brak wyników
+    if not data:
+        # Tworzymy pusty DataFrame z kolumnami, żeby Excel nie był uszkodzony
+        df = pd.DataFrame(columns=["Email studenta", "Grupa", "Priorytet", "Status", "Data zgłoszenia"])
+    else:
+        df = pd.DataFrame(data)
+
+    # generowanie pliku Excel w pamięci (RAM)
+    output = BytesIO()
+    
+    # Używamy silnika openpyxl, index=False usuwa kolumnę z numerami wierszy (0,1,2...)
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="Wyniki")
+    
+    # sum magic mambo jambo
+    output.seek(0)
+    
+    # przygotowanie tytulu i wysyłka
+    safe_title = campaign.title.replace(" ", "_")
+    filename = f"wyniki_{safe_title}.xlsx"
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="{filename}"'
+    }
+    
+    return StreamingResponse(
+        output, 
+        headers=headers, 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
