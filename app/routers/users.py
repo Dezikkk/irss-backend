@@ -76,7 +76,7 @@ async def get_available_campaigns(
     statement = (
         select(RegistrationCampaign)
         .where(col(RegistrationCampaign.id).in_(current_user.allowed_campaign_ids)) 
-        .where(RegistrationCampaign.is_active == True)
+        #.where(RegistrationCampaign.is_active == True)
         .options(selectinload(getattr(RegistrationCampaign, "groups"))) 
     )
     

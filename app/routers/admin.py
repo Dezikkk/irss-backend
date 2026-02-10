@@ -315,11 +315,11 @@ async def get_campaign_details(
     results = db.exec(statement).all()
     
     groups_response = []
-    total_students = 0 # sumuje przypisanych (ASSIGNED)
+    total_students = 0
 
-    for group, assigned_count, priority_count in results:
+    for group, reg_count, priority_count in results:
 
-        total_students += assigned_count
+        total_students += reg_count
         if group.id is None: continue 
 
         groups_response.append(
@@ -328,8 +328,8 @@ async def get_campaign_details(
                 name=group.name,
                 limit=group.limit,
                 first_priority_count=priority_count,    # ile chętnych na 1. wybór
-                current_count=assigned_count,           # ile miejsc zajętych(po przydzielniu)
-                is_full=assigned_count >= group.limit
+                current_count=reg_count,                # ile miejsc zajętych(po przydzielniu)
+                is_full=reg_count >= group.limit
             )
         )
 
@@ -342,7 +342,7 @@ async def get_campaign_details(
         starts_at=campaign.starts_at,
         ends_at=campaign.ends_at,
         is_active=is_active_now,
-        total_registered_students=total_students,
+        total_registered_students=total_students/len(campaign.groups), # Absolutely unsafe hack and i should get killed
         groups=groups_response
     )
     
