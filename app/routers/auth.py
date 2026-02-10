@@ -168,65 +168,90 @@ async def request_magic_link(
     )
     
   
-@router.get("/verify", response_model=TokenResponse)
+@router.get("/verify")
 async def verify_token(token: str, db: SessionDep, invite: str | None = None):
     """
-    Weryfikuje link z maila i loguje użytkownika.
-    
-    Zmiana: Nie sprawdza powiązania z kampanią ani jej istnienia. 
-    Po prostu przekierowuje na frontend z tokenem JWT w ciasteczku.
+    Weryfikuje link logowania.
+    Generuje link zgodny z wymaganiami frontendu:
+    /?group_id={3_LITERY}-{ILOSC_GRUP}G&invite={KOD}
     """
     
-    # 1. Sprawdź token autoryzacyjny (Magic Link)
+    # 1. Walidacja tokenu AuthToken
     auth_token = db.exec(select(AuthToken).where(AuthToken.token == token)).first()
     
     if not auth_token or not auth_token.is_valid:
-        raise HTTPException(
-            status_code=401, 
-            detail="Link jest nieważny lub wygasł."
-        )
+        raise HTTPException(status_code=401, detail="Link jest nieważny lub wygasł.")
 
-    # 2. Sprawdź użytkownika
+    # 2. Walidacja użytkownika
     user = db.exec(select(User).where(User.email == auth_token.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="Użytkownik nie istnieje.")
     
-    # 3. Ustalanie przekierowania
-    # Domyślny redirect na stronę główną lub panel (zależnie od tego jak masz ustawiony frontend)
-    redirect = f"{settings.FRONTEND_URL}/"
+    # 3. Budowanie URL przekierowania
+    redirect = f"{settings.FRONTEND_URL}/" # Domyślny fallback
 
-    # Jeśli jest parametr invite, przekazujemy go do frontendu, 
-    # ale BEZ odpytywania bazy o szczegóły kampanii.
     if invite:
-        redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
+        # Próba zbudowania "bogatego" linku dla frontendu
+        try:
+            # Pobierz zaproszenie
+            campaign_invite = db.exec(
+                select(Invitation).where(Invitation.token == invite)
+            ).first()
+
+            if campaign_invite and campaign_invite.target_campaign_id:
+                campaign_id = campaign_invite.target_campaign_id
+
+                # Pobierz tytuł (3 litery)
+                campaign = db.get(RegistrationCampaign, campaign_id)
+                if campaign:
+                    three_letters = campaign.title[:3].upper()
+                    
+                    # Policz grupy
+                    group_amount = db.exec(
+                        select(func.count(RegistrationGroup.id))
+                        .where(RegistrationGroup.campaign_id == campaign_id)
+                    ).one()
+
+                    # --- TUTAJ JEST FORMAT KTÓREGO WYMAGA FRONTEND ---
+                    redirect = f"{settings.FRONTEND_URL}/?group_id={three_letters}-{group_amount}G&invite={invite}"
+                else:
+                    # Kampania nie istnieje? Fallback
+                    redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
+            else:
+                redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
+
+        except Exception as e:
+            # W razie błędu bazy, nie blokuj logowania, ale daj prosty link
+            print(f"Błąd generowania linku redirect: {e}")
+            redirect = f"{settings.FRONTEND_URL}/?invite={invite}"
+
     else:
-        # Logika dla zwykłego logowania (bez zaproszenia)
+        # Zwykłe logowanie (bez zaproszenia)
         if user.role == UserRole.ADMIN:
             redirect = f"{settings.FRONTEND_URL}/pages/PanelStarosty.html"
         else:
-            # Domyślny panel dla studenta (jeśli istnieje taka ścieżka)
             redirect = f"{settings.FRONTEND_URL}/pages/StudentPanel.html"
 
-    # 4. Generuj JWT
+    # 4. Generowanie JWT
     access_token_expires = timedelta(hours=settings.SESSION_EXPIRE_HOURS)
     access_token = create_access_token(
         data={"sub": str(user.id)},
         expires_delta=access_token_expires
     )
 
-    # 5. Unieważnij magic link (jednorazowy użytek)
+    # 5. Zużycie tokenu jednorazowego
     auth_token.is_used = True
     db.add(auth_token)
     db.commit()
 
-    # 6. Zwróć przekierowanie z ciasteczkiem
+    # 6. Odpowiedź z ciasteczkiem
     response = RedirectResponse(url=redirect)
     response.set_cookie(
         key="access_token",
         value=access_token,
         max_age=access_token_expires.total_seconds(),
         httponly=True,
-        secure=True, # Wymagane dla samesite="none" (na produkcji musi być HTTPS)
+        secure=True, # Wymagane dla samesite="none" (na produkcji/renderze)
         samesite="none",
         path="/"
     )
