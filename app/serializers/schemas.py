@@ -143,6 +143,7 @@ class GroupPreference(BaseModel):
 class CampaignRegistrationRequest(BaseModel):
     """Pełny wniosek studenta o zapis do kampanii (musi zawierać wszystkie grupy)"""
     preferences: List[GroupPreference]
+    invite: str
 
     @field_validator('preferences') 
     @classmethod 

@@ -10,6 +10,7 @@ from app.models.models import (
     RegistrationGroup, 
     Registration, 
     RegistrationStatus,
+    Invitation
 )
 from app.serializers.schemas import (
     CampaignRegistrationRequest,
@@ -31,16 +32,29 @@ async def submit_preferences(
     if not payload.preferences:
         raise HTTPException(status_code=400, detail="Lista preferencji jest pusta.")
 
-    # pobierz ID pierwszej grupy, żeby namierzyć kampanię
-    first_group_id = payload.preferences[0].group_id
-    first_group = db.get(RegistrationGroup, first_group_id)
-    
-    if not first_group or first_group.id is None:
-        raise HTTPException(status_code=404, detail="Nie znaleziono grupy.")
-        
-    campaign = first_group.campaign
+    # Get the campaign through the invite code
+    campaign = db.exec(
+        select(Invitation)
+        .where(col(Invitation.token) == payload.invite)
+    ).one().target_campaign
+
     if not campaign or campaign.id is None:
         raise HTTPException(status_code=404, detail="Grupa nie jest przypisana do kampanii.")
+
+    # Pobierz id grupy z najmniejszym indeksem,
+    # żeby przesunąc id względem tabeli.
+    all_campaign_groups_ids = [g.id for g in campaign.groups if g.id is not None]
+    group_id_offset = min(all_campaign_groups_ids)-1 # oczekujemy id od 1 a nie od 0
+
+    # czy student ocenił WSZYSTKIE grupy?
+    # pobieramy wszystkie grupy z tej kampanii
+    submitted_groups_ids = [p.group_id+group_id_offset for p in payload.preferences]
+
+    if set(all_campaign_groups_ids) != set(submitted_groups_ids):
+        raise HTTPException(
+            status_code=400, 
+            detail="Musisz ustawić priorytet dla WSZYSTKICH dostępnych grup w kampanii."
+        )
 
     # sprawdzamy czy student ma uprawnienia do tej kampanii w allowed_campaign_ids
     if campaign.id not in current_user.allowed_campaign_ids:
@@ -60,21 +74,6 @@ async def submit_preferences(
 
     if existing_reg:
         raise HTTPException(status_code=400, detail="Już złożyłeś wniosek w tej kampanii. Edycja jest zablokowana.")
-
-    # czy student ocenił WSZYSTKIE grupy?
-    # pobieramy wszystkie grupy z tej kampanii
-    all_campaign_groups_ids = [g.id for g in campaign.groups if g.id is not None]
-    submitted_groups_ids = [p.group_id for p in payload.preferences]
-
-    if set(all_campaign_groups_ids) != set(submitted_groups_ids):
-        raise HTTPException(
-            status_code=400, 
-            detail="Musisz ustawić priorytet dla WSZYSTKICH dostępnych grup w kampanii."
-        )
-
-    # Pobierz id grupy z najmniejszym indeksem,
-    # żeby przesunąc id względem tabeli.
-    group_id_offset = min(all_campaign_groups_ids)-1 # oczekujemy id od 1 a nie od 0
 
     new_registrations = []
     
