@@ -302,11 +302,7 @@ async def get_campaign_details(
         )
         .outerjoin(
             Registration,
-            and_(
-                col(Registration.group_id) == col(RegistrationGroup.id),
-                #col(Registration.status) != RegistrationStatus.REJECTED 
-                # ^ ignorujemy odrzuconych, bierzemy SUBMITTED i ASSIGNED
-            )
+            col(Registration.group_id) == col(RegistrationGroup.id)
         )
         .where(col(RegistrationGroup.campaign_id) == campaign_id)
         .group_by(col(RegistrationGroup.id))
