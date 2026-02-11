@@ -45,7 +45,7 @@ async def register_with_invite(
             detail=f"Wymagany mail w domenie {settings.ALLOWED_DOMAINS}"
         )
 
-    # pobranie i walidacja zapro
+    # pobranie i walidacja zaproszenia
     invite = db.exec(select(Invitation).where(Invitation.token == code)).first()
     if not invite:
         raise HTTPException(status_code=404, detail="Nieprawidłowy kod zaproszenia.")
@@ -63,7 +63,6 @@ async def register_with_invite(
 
     # sprawdź czy user już istnieje
     user = db.exec(select(User).where(User.email == email)).first()
-    new_admin = False # Rozpatrowywanie przypadku tworzenia nowego starosty
 
     if user:
     # --- SCENARIUSZ A: UPDATE ISTNIEJĄCEGO USERA ---
@@ -99,8 +98,6 @@ async def register_with_invite(
         )
         db.add(new_user)
         message_detail = "Konto utworzone pomyślnie!"
-        if invite.target_role == UserRole.ADMIN:
-            new_admin = True
 
     # generuj i wyslij magic link
     token = generate_magic_token()
@@ -120,8 +117,12 @@ async def register_with_invite(
 
     db.commit()
     
-    # Jeżeli utworzono nowego starostę, magic link przekierowuje do panelu starosty 
-    await send_magic_link_email(email, token, invite=code if not new_admin else None)
+    # Jeżeli starosta się loguje albo rejestruje, nie przekazujemy kodu zaproszenia
+    # Zamiast tego przekierujemy go do panelu starosty
+    if code == settings.DEFAULT_ADMIN_INVITE_TOKEN:
+        code = None
+
+    await send_magic_link_email(email, token, invite=code)
 
     return MagicLinkResponse(
         message="Sukces!",

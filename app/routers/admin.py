@@ -550,14 +550,13 @@ async def download_campaign_results(
             "Indeks studenta": row.index,
             "Grupa": row.group_name,
             "Priorytet": row.priority,
-            "Status": row.status,
             "Data zgłoszenia": row.created_at.strftime("%Y-%m-%d %H:%M")
         })
 
     # Obsługa przypadku, gdy brak wyników
     if not data:
         # Tworzymy pusty DataFrame z kolumnami, żeby Excel nie był uszkodzony
-        df = pd.DataFrame(columns=["Indeks studenta", "Grupa", "Priorytet", "Status", "Data zgłoszenia"])
+        df = pd.DataFrame(columns=["Indeks studenta", "Grupa", "Priorytet", "Data zgłoszenia"])
     else:
         df = pd.DataFrame(data)
 
