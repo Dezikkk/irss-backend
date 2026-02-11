@@ -332,7 +332,7 @@ async def get_campaign_details(
     now = datetime.now()
     is_active_now = campaign.starts_at <= now <= campaign.ends_at
 
-    total_students /= len(campaign.groups), # Absolutely unsafe hack and i should get killed
+    total_students /= len(campaign.groups) # Absolutely unsafe hack and i should get killed
 
     return CampaignDetailResponse(
         id=campaign.id,
