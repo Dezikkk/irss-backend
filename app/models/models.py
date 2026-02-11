@@ -27,6 +27,7 @@ class User(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
+    index: str
     # rola usera (domyślnie student)
     role: UserRole = Field(sa_column=Column(Enum(UserRole), default=UserRole.STUDENT))
     # lista ID kampanii przechowywana jako JSON

@@ -18,6 +18,7 @@ class MagicLinkResponse(BaseModel):
 class RegisterWithInviteRequest(BaseModel):
     """Dane potrzebne do założenia konta przez studenta za pomocą kodu od Starosty"""
     email: EmailStr
+    index: str | None
     invite: str
  
 class TokenResponse(BaseModel):

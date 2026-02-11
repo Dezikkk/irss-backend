@@ -93,6 +93,7 @@ async def register_with_invite(
 
         new_user = User(
             email=email,
+            index=payload.index,
             role=invite.target_role,                 
             allowed_campaign_ids=initial_campaigns 
         )

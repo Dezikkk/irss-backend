@@ -291,7 +291,7 @@ async def get_campaign_details(
         select(
             RegistrationGroup,
             # licznik 1: Ilość zapisóœ do grupy
-            func.count(),
+            func.count(col(Registration.id)),
             # licznik 2: popularność
             # ile osob dala ta grupe na pierwszy priorytet
             func.count(
@@ -304,7 +304,7 @@ async def get_campaign_details(
             Registration,
             and_(
                 col(Registration.group_id) == col(RegistrationGroup.id),
-                col(Registration.status) != RegistrationStatus.REJECTED 
+                #col(Registration.status) != RegistrationStatus.REJECTED 
                 # ^ ignorujemy odrzuconych, bierzemy SUBMITTED i ASSIGNED
             )
         )
@@ -328,7 +328,7 @@ async def get_campaign_details(
                 name=group.name,
                 limit=group.limit,
                 first_priority_count=priority_count,    # ile chętnych na 1. wybór
-                current_count=reg_count,                # ile miejsc zajętych(po przydzielniu)
+                current_count=reg_count,                # ile zapisów
                 is_full=reg_count >= group.limit
             )
         )
@@ -336,13 +336,15 @@ async def get_campaign_details(
     now = datetime.now()
     is_active_now = campaign.starts_at <= now <= campaign.ends_at
 
+    total_students /= len(campaign.groups), # Absolutely unsafe hack and i should get killed
+
     return CampaignDetailResponse(
         id=campaign.id,
         title=campaign.title,
         starts_at=campaign.starts_at,
         ends_at=campaign.ends_at,
         is_active=is_active_now,
-        total_registered_students=total_students/len(campaign.groups), # Absolutely unsafe hack and i should get killed
+        total_registered_students=total_students,
         groups=groups_response
     )
     
@@ -529,7 +531,7 @@ async def download_campaign_results(
     # pobieramy dane studentów i ich przydziałów
     statement = (
         select(
-            User.email,
+            User.index,
             RegistrationGroup.name.label("group_name"),
             Registration.priority,
             Registration.status,
@@ -540,7 +542,7 @@ async def download_campaign_results(
         .where(RegistrationGroup.campaign_id == campaign_id)
         # Jeśli chcesz pełną listę zgłoszeń, usuń poniższą linię:
         .where(Registration.status == RegistrationStatus.ASSIGNED) 
-        .order_by(RegistrationGroup.name, User.email)
+        .order_by(RegistrationGroup.name, User.index)
     )
     
     results = db.exec(statement).all()
@@ -549,7 +551,7 @@ async def download_campaign_results(
     data = []
     for row in results:
         data.append({
-            "Email studenta": row.email,
+            "Indeks studenta": row.index,
             "Grupa": row.group_name,
             "Priorytet": row.priority,
             "Status": row.status,
@@ -559,7 +561,7 @@ async def download_campaign_results(
     # Obsługa przypadku, gdy brak wyników
     if not data:
         # Tworzymy pusty DataFrame z kolumnami, żeby Excel nie był uszkodzony
-        df = pd.DataFrame(columns=["Email studenta", "Grupa", "Priorytet", "Status", "Data zgłoszenia"])
+        df = pd.DataFrame(columns=["Indeks studenta", "Grupa", "Priorytet", "Status", "Data zgłoszenia"])
     else:
         df = pd.DataFrame(data)
 
