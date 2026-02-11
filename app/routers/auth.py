@@ -126,46 +126,6 @@ async def register_with_invite(
         message="Sukces!",
         detail=f"{message_detail} Na adres {email} wysłaliśmy link logujący."
     )
-
-# logowanie (dla osób które już mają konto)
-@router.post("/request-magic-link", response_model=MagicLinkResponse)
-async def request_magic_link(
-    email_request: EmailRequest,
-    db: SessionDep
-):
-    """
-    Wysyła jednorazowy token logowania na e-mail dla użytkowników, którzy mają już konto w systemie.
-    """
-    
-    email = email_request.email
-    
-    # czy taki student w ogóle istnieje
-    user = db.exec(select(User).where(User.email == email)).first()
-    if not user:
-         raise HTTPException(
-            status_code=404,
-            detail="Taki użytkownik nie istnieje. Jeśli masz kod od starosty, użyj rejestracji z kodem."
-        )
-
-    # generowanie tokenu logowania
-    token = generate_magic_token()
-    expires_at = datetime.now() + timedelta(minutes=settings.TOKEN_EXPIRE_MINUTES)
-    
-    auth_token = AuthToken(
-        email=email,
-        token=token,
-        expires_at=expires_at
-    )
-    
-    db.add(auth_token)
-    db.commit()
-    
-    await send_magic_link_email(email, token)
-    
-    return MagicLinkResponse(
-        message="Sprawdź skrzynkę",
-        detail=f"Wysłano link logowania na adres {email}."
-    )
     
   
 @router.get("/verify", response_model=TokenResponse)

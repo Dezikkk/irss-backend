@@ -27,7 +27,7 @@
         - [x] FCFS (priorities + time of applications)
         - [x] lottery (priorities and luck)
         - [x] random (ignore preferences) 
-    - [ ] generating excel results
+    - [X] generating excel results
 - [x] adding debug mode that enables a dangerous test endpoints, which can be enabled in .env
 - [ ] using a throttling mechanism for smtp to ensure the limits are not exceeded (30 mails/min in outlook's case)
 - [ ] smtp error handling
@@ -35,7 +35,7 @@
 - [ ] add rate limiting and other protection methods if needed
 - [ ] pretty readme
 - [x] docker build
-- [ ] real automatized tests
+- [ ] real automized tests
 
 
 ## Project structure
@@ -84,7 +84,6 @@ Detailed description of every endpoint is avaiable on localhost:8000/docs
 | method | endpoint | who | what it does |
 | :---: | --- | :---: | --- |
 |**POST**|auth/register-with-invite|anyone|signup for newbies (u need a code)|
-|**POST**|auth/request-magic-link|anyone|login if u have an account (sends the email)|
 |**GET**|/auth/verify|anyone|"the thing u click in email, swaps link for jwt token"|
 |**GET**|/users/dashboard|logged-in user|shows ur info & checks if ur admin or student|
 |**GET**|/users/available-campaigns|logged-in user|see what campaigns are there + popularity stats|
@@ -95,6 +94,7 @@ Detailed description of every endpoint is avaiable on localhost:8000/docs
 |**POST**|/admin/campaigns/{id}/groups|admin|bulk add groups to campaign|
 |**PATCH**|/admin/groups/{id}|admin|edit group name or limit|
 |**POST**|/admin/campaigns/{id}/resolve|admin|assigns students to groups according to the selected method|
+|**POST**|/admin/campaigns/{id}/download|admin|downloads excel file with registrations from a resolved campaign|
 |**POST**|/student/register|logged-in user|send your priorities for a campaign|
 |**GET**|/student/my-groups|logged-in user|shows ur assigned classes and ur priorities|
 |**POST**|/debug/create-user|anyone|creates user instantly (skips email magic link)|
