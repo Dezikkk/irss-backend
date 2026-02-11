@@ -37,7 +37,8 @@ async def environment_variables_dump():
         "APP_NAME": settings.APP_NAME,
         "BACKEND_URL": settings.BACKEND_URL,
         "FRONTEND_URL": settings.FRONTEND_URL,
-        "DEBUG_MODE": settings.DEBUG_MODE
+        "DEBUG": settings.DEBUG,
+        "DEFAULT_ADMIN_INVITE_TOKEN": settings.DEFAULT_ADMIN_INVITE_TOKEN
     }
 
 @router.get("/database")

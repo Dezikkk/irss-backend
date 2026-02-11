@@ -48,7 +48,7 @@ app.include_router(users.router)
 app.include_router(admin.router)
 app.include_router(student.router)
 
-if settings.DEBUG_MODE:
+if settings.DEBUG:
     app.include_router(debug.router)
     print(f"\n{'!'*40}")
     print("UWAGA: TRYB DEBUG WŁĄCZONY")
@@ -70,5 +70,5 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.DEBUG_MODE
+        reload=settings.DEBUG
     )

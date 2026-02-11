@@ -85,7 +85,7 @@ Detailed description of every endpoint is avaiable on localhost:8000/docs
 | :---: | --- | :---: | --- |
 |**POST**|auth/register-with-invite|anyone|signup for newbies (u need a code)|
 |**GET**|/auth/verify|anyone|"the thing u click in email, swaps link for jwt token"|
-|**GET**|/users/dashboard|logged-in user|shows ur info & checks if ur admin or student|
+|**GET**|/users/me|logged-in user|shows ur info & checks if ur admin or student|
 |**GET**|/users/available-campaigns|logged-in user|see what campaigns are there + popularity stats|
 |**POST**|/admin/create-student-invite|admin|generates the invitation link for student|
 |**POST**|/admin/campaigns/create|admin|creates new registration campaign|

@@ -26,7 +26,7 @@ database_url = URL.create(
 
 engine = create_engine(
     database_url,
-    echo=settings.DEBUG_MODE,
+    echo=settings.DEBUG,
     pool_pre_ping=True,
 )
 
@@ -42,17 +42,16 @@ def _create_admin_invitation():
     # żeby mogli się zarejestrować od razu z /auth/register-with-invite
     # Warto usunąć magic numbers...
     with Session(engine) as db:
-        DEFAULT_ADMIN_INVITE_TOKEN = "przepraszam"
         # Sprawdź czy zaproszenie już istnieje
         existing = db.exec(
-            select(Invitation).where(Invitation.token == DEFAULT_ADMIN_INVITE_TOKEN)
+            select(Invitation).where(Invitation.token == settings.DEFAULT_ADMIN_INVITE_TOKEN)
         ).first()
         
         if existing:
             return
         
         admin_invite = Invitation(
-            token=DEFAULT_ADMIN_INVITE_TOKEN,
+            token=settings.DEFAULT_ADMIN_INVITE_TOKEN,
             target_role=UserRole.ADMIN,
             max_uses=1000,
             expires_at=datetime.now() + timedelta(weeks=1000)
