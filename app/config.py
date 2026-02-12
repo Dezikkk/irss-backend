@@ -1,7 +1,6 @@
 from functools import lru_cache
 from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import resend
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -40,5 +39,3 @@ def get_settings():
     return Settings() # type: ignore
 
 settings = get_settings()
-
-resend.api_key = settings.RESEND_API_KEY
