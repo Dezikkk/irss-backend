@@ -15,8 +15,6 @@ RUN apt-get purge -y gcc && \
     rm -rf /var/lib/apt/lists/*
 
 COPY app ./app
-COPY tests ./app
-COPY create_invite.py /app/
 
 EXPOSE 8000
 
