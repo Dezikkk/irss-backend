@@ -38,7 +38,8 @@ async def send_magic_link_email(email: str, token: str, invite: str = None):
         resend.Emails.send({
             "from": settings.RESEND_EMAIL_FROM,
             # "to": email,
-            "to": settings.SMTP_USER, # debug test potem to zamien
+            #"to": settings.SMTP_USER, # debug test potem to zamien
+            "to": email
             "subject": f"{settings.APP_NAME} - Magic Link",
             "html": html
         })
