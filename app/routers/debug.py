@@ -36,6 +36,7 @@ async def environment_variables_dump():
         "RESEND_EMAIL_FROMM": settings.RESEND_EMAIL_FROM,
         "APP_NAME": settings.APP_NAME,
         "BACKEND_URL": settings.BACKEND_URL,
+        "BACKEND_PORT": settings.BACKEND_PORT,
         "FRONTEND_URL": settings.FRONTEND_URL,
         "DEBUG": settings.DEBUG,
         "DEFAULT_ADMIN_INVITE_TOKEN": settings.DEFAULT_ADMIN_INVITE_TOKEN

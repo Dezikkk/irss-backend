@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     RESEND_EMAIL_FROM: str
     APP_NAME: str
     BACKEND_URL: str
+    BACKEND_PORT: str
     FRONTEND_URL: str
     DEBUG: bool = False
     DEFAULT_ADMIN_INVITE_TOKEN: str
