@@ -229,7 +229,7 @@ async def verify_token(token: str, db: SessionDep, invite: str | None = None):
         max_age=access_token_expires.total_seconds(),
         httponly=True,
         secure=True, 
-        samesite="none",
+        samesite="lax",
         path="/"
     )
     

@@ -117,7 +117,7 @@ async def create_test_user(
         max_age=60 * 60 * 24,
         httponly=True,
         secure= True,
-        samesite="none",
+        samesite="lax",
         path="/"
     )
 
