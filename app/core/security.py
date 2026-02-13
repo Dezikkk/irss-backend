@@ -18,7 +18,7 @@ def generate_magic_token() -> str:
     return secrets.token_urlsafe(32)
 
 async def send_magic_link_email(email: str, token: str, invite: str = None):
-    magic_link = f"{settings.BACKEND_URL}:{settings.BACKEND_PORT}/auth/verify?token={token}"
+    magic_link = f"{settings.BACKEND_URL}/auth/verify?token={token}"
     if invite:
         magic_link += f"&invite={invite}"
 
@@ -27,7 +27,8 @@ async def send_magic_link_email(email: str, token: str, invite: str = None):
     message["To"] = email
     message["Subject"] = f"{settings.APP_NAME} - Magic Link"
 
-    message.set_content(f'''
+    message.add_header('Content-Type','text/html')
+    message.set_payload(f'''
         <h2>Logowanie do {settings.APP_NAME}</h2>
         <p>Kliknij w link poniżej, aby się zalogować:</p>
         <p>Jeżeli nie jesteś {email} to... Coś poszło nie tak...</p>
@@ -38,7 +39,7 @@ async def send_magic_link_email(email: str, token: str, invite: str = None):
         <p>Link wygaśnie za {settings.TOKEN_EXPIRE_MINUTES} minut.</p>
         <br/>
         <p>Pozdro,<br>{settings.APP_NAME}</p>
-    ''')
+    '''.encode("UTF-8"))
 
     try:
         await aiosmtplib.send(
